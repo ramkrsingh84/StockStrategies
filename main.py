@@ -74,4 +74,4 @@ if st.session_state.results is not None:
                 return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
             styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-            st.dataframe(styled_df, width="stretch")
+            st.dataframe(buy_df, use_container_width=True)
