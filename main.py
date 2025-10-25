@@ -7,17 +7,17 @@ import streamlit_authenticator as stauth
 import yaml
 
 
-# ✅ Load YAML config
+# ✅ Load config from YAML
 with open("config.yaml") as file:
     config = yaml.safe_load(file)
 
-# ✅ Extract values manually
+# ✅ Extract values
 credentials = config["credentials"]
 cookie_name = config["cookie"]["name"]
 key = config["cookie"]["key"]
 expiry_days = config["cookie"]["expiry_days"]
 
-# ✅ Use legacy constructor
+# ✅ Create authenticator
 authenticator = stauth.Authenticate(
     credentials,
     cookie_name,
@@ -25,17 +25,24 @@ authenticator = stauth.Authenticate(
     expiry_days
 )
 
-# ✅ Login widget
-name, authentication_status, username = authenticator.login("🔐 Login", "main")
+# ✅ Login widget — DO NOT assign return values
+authenticator.login("🔐 Login", "main")
 
-# ✅ Handle login states
-if authentication_status is False:
+
+# ✅ Use session state to control flow
+auth_status = st.session_state.get("authentication_status")
+name = st.session_state.get("name")
+
+st.write("Auth status:", auth_status)
+
+if auth_status is False:
     st.error("❌ Incorrect username or password")
-elif authentication_status is None:
+elif auth_status is None:
     st.warning("⚠️ Please enter your credentials")
-elif authentication_status:
+elif auth_status is True:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
 
 
