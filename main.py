@@ -6,13 +6,13 @@ from core.columns import col
 import streamlit_authenticator as stauth
 
 
-# ✅ Inline config dictionary
+# ✅ Manually define config dictionary
 config = {
     "credentials": {
         "usernames": {
             "ram": {
                 "name": "Ram",
-                "password": "yourpassword123"  # You can hash this later
+                "password": "yourpassword123"  # Plaintext for now
             },
             "alice": {
                 "name": "Alice",
@@ -30,14 +30,15 @@ config = {
 # ✅ Create authenticator
 authenticator = stauth.Authenticate(
     config,
-    cookie_name=config["cookie"]["name"],
-    key=config["cookie"]["key"],
-    cookie_expiry_days=config["cookie"]["expiry_days"]
+    cookie_name="auth_cookie",
+    key="dma_dashboard",
+    cookie_expiry_days=1
 )
 
 # ✅ Login widget
 name, auth_status, username = authenticator.login("🔐 Login", "main")
 
+# ✅ Handle login states
 if auth_status == False:
     st.error("❌ Incorrect username or password")
 elif auth_status == None:
