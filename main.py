@@ -45,67 +45,49 @@ elif authentication_status:
 
     st.title("📈 DMA Signal Dashboard")
 
-    # Session state setup
-    if "selected_strategy" not in st.session_state:
-        st.session_state.selected_strategy = list(STRATEGY_CONFIG.keys())[0]
-    if "results" not in st.session_state:
-        st.session_state.results = None
-
-    # Strategy selection
-    st.session_state.selected_strategy = st.selectbox(
-        "Choose Strategy",
-        list(STRATEGY_CONFIG.keys()),
-        index=list(STRATEGY_CONFIG.keys()).index(st.session_state.selected_strategy)
+    # ✅ Tabs setup (only visible after login)
+    tabs = st.tabs(
+        [f"🟢 {strategy} BUY Signals" for strategy in STRATEGY_CONFIG.keys()] +
+        ["📊 Portfolio with SELL Triggers"]
     )
 
-    # Run button
-    if st.button("Run Strategy"):
-        runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
-        st.session_state.results = runner.run()
-
-    # Render results
-    if st.session_state.results is not None:
-        result_df = st.session_state.results
-
-        if result_df.empty:
-            st.success("✅ No actionable signals today.")
-        else:
-            # BUY signals table
+    # ✅ BUY signal tabs
+    for i, strategy in enumerate(STRATEGY_CONFIG.keys()):
+        with tabs[i]:
+            runner = StrategyRunner(strategy, STRATEGY_CONFIG[strategy])
+            result_df = runner.run()
             buy_df = result_df[result_df["Signal"] == "BUY"]
-            if not buy_df.empty:
-                st.subheader("🟢 BUY Signals")
-                st.dataframe(buy_df, width="stretch")
 
-            # SELL signals
-            sell_df = result_df[result_df["Signal"] == "SELL"].copy()
-            sell_df.loc[:, "Signal"] = "SELL"
+            if buy_df.empty:
+                st.success(f"✅ No BUY signals for {strategy}")
+            else:
+                st.subheader(f"🟢 BUY Signals for {strategy}")
+                st.dataframe(buy_df, use_container_width=True)
 
-            # Load portfolio
-            portfolio_runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
-            portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[st.session_state.selected_strategy]["portfolio_tab"])
+    # ✅ Portfolio tab with SELL triggers
+    with tabs[-1]:
+        selected_strategy = st.selectbox("Choose strategy for portfolio view", list(STRATEGY_CONFIG.keys()))
+        runner = StrategyRunner(selected_strategy, STRATEGY_CONFIG[selected_strategy])
+        result_df = runner.run()
+        sell_df = result_df[result_df["Signal"] == "SELL"]
 
-            if not portfolio_df.empty:
-                st.subheader("📊 Portfolio Summary with SELL Signals")
+        portfolio_df = runner.portfolio_mgr.load(STRATEGY_CONFIG[selected_strategy]["portfolio_tab"])
+        portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
 
-                # Merge SELL signals into portfolio
-                portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
-                merged = portfolio_df.merge(
-                    sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
-                    how="left",
-                    left_on=col("ticker"),
-                    right_on=col("ticker")
-                )
+        merged = portfolio_df.merge(
+            sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
+            how="left",
+            left_on=col("ticker"),
+            right_on=col("ticker")
+        )
+        merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-                # Add highlight column
-                merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+        show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
+        filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
 
-                # SELL filter checkbox
-                show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
-                filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
+        def highlight_sell(row):
+            return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
-                # Styling
-                def highlight_sell(row):
-                    return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
-
-                styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-                st.dataframe(styled_df, width="stretch")
+        styled_df = filtered_df.style.apply(highlight_sell, axis=1)
+        st.subheader("📊 Portfolio Summary")
+        st.dataframe(styled_df, use_container_width=True)
