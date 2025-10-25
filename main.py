@@ -28,7 +28,7 @@ authenticator = stauth.Authenticate(
 # ✅ Login widget — must be top-level and assigned
 name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
-counter = 0
+counter = 1
 # ✅ Debug print
 st.write("Authentication status:", authentication_status)
 st.write("counter status:", counter)
