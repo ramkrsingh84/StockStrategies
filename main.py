@@ -7,15 +7,19 @@ import streamlit_authenticator as stauth
 import yaml
 
 
-# ✅ Load config
-with open("config.yaml") as file:
-    config = yaml.safe_load(file)
+# ✅ Load config from secrets
+credentials = {
+    "usernames": {
+        "ram": {
+            "name": st.secrets["credentials"]["usernames"]["ram"]["name"],
+            "password": st.secrets["credentials"]["usernames"]["ram"]["password"]
+        }
+    }
+}
 
-# ✅ Extract values
-credentials = config["credentials"]
-cookie_name = config["cookie"]["name"]
-key = config["cookie"]["key"]
-expiry_days = config["cookie"]["expiry_days"]
+cookie_name = st.secrets["cookie"]["name"]
+key = st.secrets["cookie"]["key"]
+expiry_days = st.secrets["cookie"]["expiry_days"]
 
 # ✅ Create authenticator
 authenticator = stauth.Authenticate(
@@ -25,14 +29,9 @@ authenticator = stauth.Authenticate(
     expiry_days
 )
 
-# ✅ Counter to test rerun
-if "counter" not in st.session_state:
-    st.session_state.counter = 0
-st.session_state.counter += 1
-st.write("Rerun count:", st.session_state.counter)
-
-# ✅ Login widget — must be top-level
+# ✅ Login widget
 name, authentication_status, username = authenticator.login("🔐 Login", "main")
+
 
 # ✅ Handle login states
 if authentication_status is False:
