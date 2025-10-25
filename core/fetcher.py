@@ -6,7 +6,7 @@ import os
 import json
 
         
- class DataFetcher:
+class DataFetcher:
     def __init__(self, sheet_name, creds_dict):
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
