@@ -32,7 +32,13 @@ if st.session_state.results is not None:
     if result_df.empty:
         st.success("✅ No actionable signals today.")
     else:
-        # Extract SELL signals
+        # BUY signals table
+        buy_df = result_df[result_df["Signal"] == "BUY"]
+        if not buy_df.empty:
+            st.subheader("🟢 BUY Signals")
+            st.dataframe(buy_df, width="stretch")
+
+        # SELL signals
         sell_df = result_df[result_df["Signal"] == "SELL"].copy()
         sell_df.loc[:, "Signal"] = "SELL"
 
@@ -41,7 +47,7 @@ if st.session_state.results is not None:
         portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[st.session_state.selected_strategy]["portfolio_tab"])
 
         if not portfolio_df.empty:
-            st.subheader("📊 Unified Portfolio Summary")
+            st.subheader("📊 Portfolio Summary with SELL Signals")
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
@@ -55,7 +61,7 @@ if st.session_state.results is not None:
             # Add highlight column
             merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-            # Optional filter
+            # SELL filter checkbox
             show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
             filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
 
