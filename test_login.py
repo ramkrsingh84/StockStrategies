@@ -1,17 +1,21 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-import yaml
 
-# ✅ Load config from YAML
-with open("config.yaml") as file:
-    config = yaml.safe_load(file)
+# ✅ Load config from secrets
+credentials = {
+    "usernames": {
+        "ram": {
+            "name": st.secrets["credentials"]["usernames"]["ram"]["name"],
+            "password": st.secrets["credentials"]["usernames"]["ram"]["password"]
+        }
+    }
+}
 
-# ✅ Create authenticator using legacy constructor
-credentials = config["credentials"]
-cookie_name = config["cookie"]["name"]
-key = config["cookie"]["key"]
-expiry_days = config["cookie"]["expiry_days"]
+cookie_name = st.secrets["cookie"]["name"]
+key = st.secrets["cookie"]["key"]
+expiry_days = st.secrets["cookie"]["expiry_days"]
 
+# ✅ Create authenticator
 authenticator = stauth.Authenticate(
     credentials,
     cookie_name,
