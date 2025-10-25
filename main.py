@@ -29,7 +29,6 @@ if run_button:
         portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[selected_strategy]["portfolio_tab"])
 
         if not portfolio_df.empty:
-            st.subheader("📊 Portfolio Summary with SELL Signals")
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
@@ -43,6 +42,14 @@ if run_button:
 
             # Add a highlight column for styling
             merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+            
+            # Filter toggle
+            show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
+
+            if show_only_sell:
+                filtered_df = merged[merged["Highlight"] == "SELL"]
+            else:
+                filtered_df = merged
 
             # Define styling function
             def highlight_sell(row):
