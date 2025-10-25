@@ -3,12 +3,8 @@ import pandas as pd
 from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 from core.columns import col
-import streamlit_authenticator as stauth
-
 
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
-
-
 st.title("📈 DMA Signal Dashboard")
 
 # Session state setup
@@ -36,13 +32,7 @@ if st.session_state.results is not None:
     if result_df.empty:
         st.success("✅ No actionable signals today.")
     else:
-        # BUY signals table
-        buy_df = result_df[result_df["Signal"] == "BUY"]
-        if not buy_df.empty:
-            st.subheader("🟢 BUY Signals")
-            st.dataframe(buy_df, width="stretch")
-
-        # SELL signals
+        # Extract SELL signals
         sell_df = result_df[result_df["Signal"] == "SELL"].copy()
         sell_df.loc[:, "Signal"] = "SELL"
 
@@ -51,7 +41,7 @@ if st.session_state.results is not None:
         portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[st.session_state.selected_strategy]["portfolio_tab"])
 
         if not portfolio_df.empty:
-            st.subheader("📊 Portfolio Summary with SELL Signals")
+            st.subheader("📊 Unified Portfolio Summary")
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
@@ -65,7 +55,7 @@ if st.session_state.results is not None:
             # Add highlight column
             merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-            # SELL filter checkbox
+            # Optional filter
             show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
             filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
 
@@ -74,4 +64,4 @@ if st.session_state.results is not None:
                 return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
             styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-            st.dataframe(buy_df, use_container_width=True)
+            st.dataframe(styled_df, width="stretch")
