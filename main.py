@@ -9,8 +9,13 @@ import streamlit_authenticator as stauth
 # Load config from secrets
 config = st.secrets["auth_config"]
 
-# Create authenticator
-authenticator = stauth.Authenticate(config)
+# Create authenticator with explicit cookie args
+authenticator = stauth.Authenticate(
+    config,
+    cookie_name="auth_cookie",
+    key="dma_dashboard",
+    cookie_expiry_days=1
+)
 
 # Login widget
 name, auth_status, username = authenticator.login("🔐 Login", "main")
@@ -22,6 +27,7 @@ elif auth_status == None:
 elif auth_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
 
     # 🔽 Your full dashboard logic goes here
