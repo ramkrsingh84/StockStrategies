@@ -1,9 +1,11 @@
 credentials:
   usernames:
     ram:
+      email: ram@example.com
       name: Ram
       password: yourpassword123
     alice:
+      email: alice@example.com
       name: Alice
       password: alicepass
 
@@ -11,3 +13,8 @@ cookie:
   name: auth_cookie
   key: dma_dashboard
   expiry_days: 1
+
+preauthorized:
+  emails:
+    - ram@example.com
+    - alice@example.com

@@ -2,5 +2,6 @@ pandas
 numpy
 gspread
 oauth2client
-streamlit
+streamlit==1.29.0
 streamlit-authenticator==0.2.2
+PyYAML==6.0
