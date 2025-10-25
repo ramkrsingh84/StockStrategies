@@ -25,14 +25,14 @@ authenticator = stauth.Authenticate(
     expiry_days
 )
 
-# ✅ Login widget — must be top-level and assigned
-name, authentication_status, username = authenticator.login("🔐 Login", "main")
+# ✅ Counter to test rerun
+if "counter" not in st.session_state:
+    st.session_state.counter = 0
+st.session_state.counter += 1
+st.write("Rerun count:", st.session_state.counter)
 
-counter = 1
-# ✅ Debug print
-st.write("Authentication status:", authentication_status)
-st.write("counter status:", counter)
-counter = counter+1
+# ✅ Login widget — must be top-level
+name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
 # ✅ Handle login states
 if authentication_status is False:
@@ -42,6 +42,7 @@ elif authentication_status is None:
 elif authentication_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
     # 🔽 Your full dashboard logic goes here
 
