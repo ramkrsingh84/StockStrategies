@@ -7,9 +7,8 @@ import streamlit_authenticator as stauth
 import yaml
 
 
-# ✅ Load config from YAML file
-with open("config.yaml") as file:
-    config = yaml.safe_load(file)
+# ✅ Use the built-in config loader
+config = stauth.load_config("config.yaml")
 
 # ✅ Create authenticator
 authenticator = stauth.Authenticate(
@@ -29,6 +28,7 @@ elif authentication_status == None:
 elif authentication_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
     # 🔽 Your full dashboard logic goes here
 
