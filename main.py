@@ -6,28 +6,15 @@ from core.columns import col
 import streamlit_authenticator as stauth
 
 
-# Load credentials from secrets
-names = st.secrets["auth"]["names"]
-usernames = st.secrets["auth"]["usernames"]
-passwords = st.secrets["auth"]["passwords"]
-
-# Hash passwords
-hashed_pw = stauth.Hasher(passwords).generate()
+# Load config from secrets
+config = st.secrets["auth_config"]
 
 # Create authenticator
-authenticator = stauth.Authenticate(
-    names=names,
-    usernames=usernames,
-    passwords=hashed_pw,
-    cookie_name="auth_cookie",
-    key="dma_dashboard",
-    cookie_expiry_days=1
-)
+authenticator = stauth.Authenticate(config)
 
 # Login widget
 name, auth_status, username = authenticator.login("🔐 Login", "main")
 
-# Handle login states
 if auth_status == False:
     st.error("❌ Incorrect username or password")
 elif auth_status == None:
@@ -35,6 +22,7 @@ elif auth_status == None:
 elif auth_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
     # 🔽 Your full dashboard logic goes here
 
