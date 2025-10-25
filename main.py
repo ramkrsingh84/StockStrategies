@@ -6,10 +6,24 @@ from core.columns import col
 import streamlit_authenticator as stauth
 
 
-# Load config from secrets
+# Build config manually from secrets
+usernames = {}
+for username in st.secrets["auth_users"]:
+    user_data = st.secrets["auth_users"][username]
+    usernames[username] = {
+        "name": user_data["name"],
+        "password": user_data["password"]
+    }
+
 config = {
-    "credentials": st.secrets["credentials"],
-    "cookie": st.secrets["cookie"]
+    "credentials": {
+        "usernames": usernames
+    },
+    "cookie": {
+        "name": st.secrets["auth_cookie"]["name"],
+        "key": st.secrets["auth_cookie"]["key"],
+        "expiry_days": int(st.secrets["auth_cookie"]["expiry_days"])
+    }
 }
 
 # Create authenticator
@@ -30,6 +44,7 @@ elif auth_status == None:
 elif auth_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
 
     # 🔽 Your full dashboard logic goes here
