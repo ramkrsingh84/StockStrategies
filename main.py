@@ -32,7 +32,7 @@ if run_button:
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
-            sell_df["Signal"] = "SELL"
+            sell_df.loc[:, "Signal"] = "SELL"
             merged = portfolio_df.merge(
                 sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
                 how="left",
@@ -62,4 +62,4 @@ if run_button:
             styled_df = merged.style.apply(highlight_sell, axis=1)
 
             st.subheader("📊 Portfolio Summary with SELL Signals")
-            st.dataframe(styled_df, use_container_width=True)
+            st.dataframe(styled_df, width="stretch")
