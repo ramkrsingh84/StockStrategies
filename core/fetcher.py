@@ -16,21 +16,22 @@ class DataFetcher:
         self.sheet_name = sheet_name
 
     def fetch(self, tab_name):
-        sheet = self.client.open(self.sheet_name).worksheet(tab_name)
-        return _fetch_tab_data(sheet)
+        raw = _fetch_raw_data(self.sheet_name, tab_name)
+        if not raw or len(raw) < 2:
+            return pd.DataFrame()
+
+        headers = [h.strip() for h in raw[0]]
+        df = pd.DataFrame(raw[1:], columns=headers)
+        df[col("ticker")] = df[col("ticker")].astype(str).str.upper()
+
+        for c in df.columns:
+            if any(k in c for k in ["Price", "DMA", "Closing", "Minimum"]):
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+
+        return df.dropna(subset=[col("ticker"), col("current_price")])
 
 @st.cache_data(ttl=300)
-def _fetch_tab_data(sheet):
-    raw = sheet.get_all_values()
-    if not raw or len(raw) < 2:
-        return pd.DataFrame()
-
-    headers = [h.strip() for h in raw[0]]
-    df = pd.DataFrame(raw[1:], columns=headers)
-    df[col("ticker")] = df[col("ticker")].astype(str).str.upper()
-
-    for c in df.columns:
-        if any(k in c for k in ["Price", "DMA", "Closing", "Minimum"]):
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    return df.dropna(subset=[col("ticker"), col("current_price")])
+def _fetch_raw_data(sheet_name, tab_name):
+    client = gspread.service_account_from_dict(json.loads(st.secrets["GOOGLE_CREDS_JSON"]))
+    sheet = client.open(sheet_name).worksheet(tab_name)
+    return sheet.get_all_values()

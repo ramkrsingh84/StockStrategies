@@ -16,25 +16,27 @@ class PortfolioManager:
         self.sheet_name = sheet_name
 
     def load(self, tab_name):
-        sheet = self.client.open(self.sheet_name).worksheet(tab_name)
-        return _load_tab_data(sheet)
+        records = _load_raw_records(self.sheet_name, tab_name)
+        df = pd.DataFrame(records)
+        if df.empty:
+            return df
+
+        df[col("ticker")] = df[col("ticker")].astype(str).str.upper()
+        df[col("sell_date")] = pd.to_datetime(df[col("sell_date")], errors="coerce").dt.date
+        df[col("buy_date")] = pd.to_datetime(df[col("buy_date")], errors="coerce").dt.date
+
+        for c in [col("buy_price"), col("buy_qty"), col("current_price")]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+        return df.dropna(subset=[
+            col("ticker"),
+            col("buy_price"),
+            col("buy_qty"),
+            col("current_price")
+        ])
 
 @st.cache_data(ttl=300)
-def _load_tab_data(sheet):
-    df = pd.DataFrame(sheet.get_all_records())
-    if df.empty:
-        return df
-
-    df[col("ticker")] = df[col("ticker")].astype(str).str.upper()
-    df[col("sell_date")] = pd.to_datetime(df[col("sell_date")], errors="coerce").dt.date
-    df[col("buy_date")] = pd.to_datetime(df[col("buy_date")], errors="coerce").dt.date
-
-    for c in [col("buy_price"), col("buy_qty"), col("current_price")]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    return df.dropna(subset=[
-        col("ticker"),
-        col("buy_price"),
-        col("buy_qty"),
-        col("current_price")
-    ])
+def _load_raw_records(sheet_name, tab_name):
+    client = gspread.service_account_from_dict(json.loads(st.secrets["GOOGLE_CREDS_JSON"]))
+    sheet = client.open(sheet_name).worksheet(tab_name)
+    return sheet.get_all_records()
