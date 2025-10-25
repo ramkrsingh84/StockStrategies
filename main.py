@@ -7,7 +7,7 @@ from core.columns import col
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
 st.title("📈 DMA Signal Dashboard")
 
-# Initialize session state
+# Session state setup
 if "selected_strategy" not in st.session_state:
     st.session_state.selected_strategy = list(STRATEGY_CONFIG.keys())[0]
 if "results" not in st.session_state:
@@ -25,29 +25,23 @@ if st.button("Run Strategy"):
     runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
     st.session_state.results = runner.run()
 
-# If results exist, render tables
+# Render results
 if st.session_state.results is not None:
     result_df = st.session_state.results
 
     if result_df.empty:
         st.success("✅ No actionable signals today.")
     else:
-        # BUY signals
-        buy_df = result_df[result_df["Signal"] == "BUY"]
-        if not buy_df.empty:
-            st.subheader("🟢 BUY Signals")
-            st.dataframe(buy_df, width="stretch")
-
-        # SELL signals
+        # Extract SELL signals
         sell_df = result_df[result_df["Signal"] == "SELL"].copy()
-        sell_df.loc[:, "Signal"] = "SELL"  # Avoid SettingWithCopyWarning
+        sell_df.loc[:, "Signal"] = "SELL"
 
         # Load portfolio
         portfolio_runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
         portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[st.session_state.selected_strategy]["portfolio_tab"])
 
         if not portfolio_df.empty:
-            st.subheader("📊 Portfolio Summary with SELL Signals")
+            st.subheader("📊 Unified Portfolio Summary")
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
@@ -57,9 +51,11 @@ if st.session_state.results is not None:
                 left_on=col("ticker"),
                 right_on=col("ticker")
             )
+
+            # Add highlight column
             merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-            # SELL filter checkbox
+            # Optional filter
             show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
             filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
 
