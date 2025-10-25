@@ -7,7 +7,7 @@ import streamlit_authenticator as stauth
 import yaml
 
 
-# ✅ Load YAML config manually
+# ✅ Load config from YAML
 with open("config.yaml") as file:
     config = yaml.safe_load(file)
 
@@ -22,9 +22,10 @@ authenticator = stauth.Authenticate(
 # ✅ Login widget
 name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
-if authentication_status == False:
+# ✅ Handle login states
+if authentication_status is False:
     st.error("❌ Incorrect username or password")
-elif authentication_status == None:
+elif authentication_status is None:
     st.warning("⚠️ Please enter your credentials")
 elif authentication_status:
     authenticator.logout("Logout", "sidebar")
