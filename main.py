@@ -26,7 +26,7 @@ authenticator = stauth.Authenticate(
 )
 
 # ✅ Login widget — DO NOT assign return values
-authenticator.login("🔐 Login", "main")
+name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
 
 # ✅ Use session state to control flow
@@ -34,6 +34,7 @@ auth_status = st.session_state.get("authentication_status")
 name = st.session_state.get("name")
 
 st.write("Auth status:", auth_status)
+st.write("Authentication status:", authentication_status)
 
 if auth_status is False:
     st.error("❌ Incorrect username or password")
