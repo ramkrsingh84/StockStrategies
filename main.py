@@ -66,15 +66,23 @@ elif authentication_status:
 
     # ✅ Portfolio tab with SELL triggers
     with tabs[-1]:
-        runner = StrategyRunner("UnifiedPortfolio", list(STRATEGY_CONFIG.values())[0])
-        portfolio_df = runner.portfolio_mgr.load(runner.config["portfolio_tab"])
+        # ✅ Load and merge all portfolios
+        all_portfolios = []
+        for strategy, config in STRATEGY_CONFIG.items():
+            runner = StrategyRunner(strategy, config)
+            df = runner.portfolio_mgr.load(config["portfolio_tab"])
+            df["Strategy"] = strategy  # optional: tag source strategy
+            all_portfolios.append(df)
+
+        portfolio_df = pd.concat(all_portfolios, ignore_index=True)
 
         # ✅ Remove sold tickers
         active_df = portfolio_df[portfolio_df[col("sell_date")].isna()].copy()
 
         # ✅ Run SELL analysis
-        runner.analyzer.analyze_sell(active_df)
-        sell_df = pd.DataFrame(runner.analyzer.signal_log)
+        analyzer = list(STRATEGY_CONFIG.values())[0]["analyzer_class"]()
+        analyzer.analyze_sell(active_df)
+        sell_df = pd.DataFrame(analyzer.signal_log)
         sell_df = sell_df[sell_df["Signal"] == "SELL"]
 
         # ✅ Merge SELL triggers into portfolio
@@ -93,5 +101,5 @@ elif authentication_status:
             return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-        st.subheader("📊 Active Portfolio Summary")
+        st.subheader("📊 Unified Active Portfolio")
         st.dataframe(styled_df, width="stretch")
