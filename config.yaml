@@ -1,0 +1,13 @@
+credentials:
+  usernames:
+    ram:
+      name: Ram
+      password: yourpassword123
+    alice:
+      name: Alice
+      password: alicepass
+
+cookie:
+  name: auth_cookie
+  key: dma_dashboard
+  expiry_days: 1

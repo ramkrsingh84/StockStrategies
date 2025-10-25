@@ -4,51 +4,34 @@ from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 from core.columns import col
 import streamlit_authenticator as stauth
+import yaml
 
 
-# ✅ Verified config structure
-config = {
-    'credentials': {
-        'usernames': {
-            'ram': {
-                'name': 'Ram',
-                'password': 'yourpassword123'
-            },
-            'alice': {
-                'name': 'Alice',
-                'password': 'alicepass'
-            }
-        }
-    },
-    'cookie': {
-        'name': 'auth_cookie',
-        'key': 'dma_dashboard',
-        'expiry_days': 1
-    }
-}
+# ✅ Load config from YAML file
+with open("config.yaml") as file:
+    config = yaml.safe_load(file)
 
 # ✅ Create authenticator
 authenticator = stauth.Authenticate(
     config,
-    cookie_name=config['cookie']['name'],
-    key=config['cookie']['key'],
-    cookie_expiry_days=config['cookie']['expiry_days']
+    cookie_name=config["cookie"]["name"],
+    key=config["cookie"]["key"],
+    cookie_expiry_days=config["cookie"]["expiry_days"]
 )
 
 # ✅ Login widget
-name, authentication_status, username = authenticator.login('🔐 Login', 'main')
+name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
-# ✅ Handle login states
 if authentication_status == False:
-    st.error('❌ Incorrect username or password')
+    st.error("❌ Incorrect username or password")
 elif authentication_status == None:
-    st.warning('⚠️ Please enter your credentials')
+    st.warning("⚠️ Please enter your credentials")
 elif authentication_status:
-    authenticator.logout('Logout', 'sidebar')
-    st.sidebar.success(f'Welcome, {name} 👋')
-
+    authenticator.logout("Logout", "sidebar")
+    st.sidebar.success(f"Welcome, {name} 👋")
 
     # 🔽 Your full dashboard logic goes here
+
 
     st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
     st.title("📈 DMA Signal Dashboard")
