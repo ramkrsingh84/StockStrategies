@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 from core.columns import col
@@ -6,13 +7,27 @@ from core.columns import col
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
 st.title("📈 DMA Signal Dashboard")
 
-selected_strategy = st.selectbox("Choose Strategy", list(STRATEGY_CONFIG.keys()))
-run_button = st.button("Run Strategy")
+# Initialize session state
+if "selected_strategy" not in st.session_state:
+    st.session_state.selected_strategy = list(STRATEGY_CONFIG.keys())[0]
+if "results" not in st.session_state:
+    st.session_state.results = None
 
-if run_button:
-    with st.spinner("Running analysis..."):
-        runner = StrategyRunner(selected_strategy, STRATEGY_CONFIG[selected_strategy])
-        result_df = runner.run()
+# Strategy selection
+st.session_state.selected_strategy = st.selectbox(
+    "Choose Strategy",
+    list(STRATEGY_CONFIG.keys()),
+    index=list(STRATEGY_CONFIG.keys()).index(st.session_state.selected_strategy)
+)
+
+# Run button
+if st.button("Run Strategy"):
+    runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
+    st.session_state.results = runner.run()
+
+# If results exist, render tables
+if st.session_state.results is not None:
+    result_df = st.session_state.results
 
     if result_df.empty:
         st.success("✅ No actionable signals today.")
@@ -21,45 +36,36 @@ if run_button:
         buy_df = result_df[result_df["Signal"] == "BUY"]
         if not buy_df.empty:
             st.subheader("🟢 BUY Signals")
-            st.dataframe(buy_df)
+            st.dataframe(buy_df, width="stretch")
 
-        # SELL signals merged into portfolio summary
-        sell_df = result_df[result_df["Signal"] == "SELL"]
-        portfolio_runner = StrategyRunner(selected_strategy, STRATEGY_CONFIG[selected_strategy])
-        portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[selected_strategy]["portfolio_tab"])
+        # SELL signals
+        sell_df = result_df[result_df["Signal"] == "SELL"].copy()
+        sell_df.loc[:, "Signal"] = "SELL"  # Avoid SettingWithCopyWarning
+
+        # Load portfolio
+        portfolio_runner = StrategyRunner(st.session_state.selected_strategy, STRATEGY_CONFIG[st.session_state.selected_strategy])
+        portfolio_df = portfolio_runner.portfolio_mgr.load(STRATEGY_CONFIG[st.session_state.selected_strategy]["portfolio_tab"])
 
         if not portfolio_df.empty:
+            st.subheader("📊 Portfolio Summary with SELL Signals")
 
             # Merge SELL signals into portfolio
             portfolio_df[col("ticker")] = portfolio_df[col("ticker")].astype(str).str.upper()
-            sell_df.loc[:, "Signal"] = "SELL"
             merged = portfolio_df.merge(
                 sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
                 how="left",
                 left_on=col("ticker"),
                 right_on=col("ticker")
             )
-
-            # Add a highlight column for styling
             merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
-            
-            # Filter toggle
+
+            # SELL filter checkbox
             show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
+            filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
 
-            if show_only_sell:
-                filtered_df = merged[merged["Highlight"] == "SELL"]
-            else:
-                filtered_df = merged
-
-            # Define styling function
+            # Styling
             def highlight_sell(row):
-                if row["Highlight"] == "SELL":
-                    return ["background-color: #ffe6e6"] * len(row)  # light red
-                else:
-                    return [""] * len(row)
+                return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
-            # Apply styling
-            styled_df = merged.style.apply(highlight_sell, axis=1)
-
-            st.subheader("📊 Portfolio Summary with SELL Signals")
+            styled_df = filtered_df.style.apply(highlight_sell, axis=1)
             st.dataframe(styled_df, width="stretch")
