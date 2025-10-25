@@ -16,11 +16,11 @@ hashed_pw = stauth.Hasher(passwords).generate()
 
 # Create authenticator
 authenticator = stauth.Authenticate(
-    names,
-    usernames,
-    hashed_pw,
-    "dma_dashboard",
-    "auth_cookie",
+    names=names,
+    usernames=usernames,
+    passwords=hashed_pw,
+    cookie_name="auth_cookie",
+    key="dma_dashboard",
     cookie_expiry_days=1
 )
 
