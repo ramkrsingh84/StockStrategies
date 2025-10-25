@@ -12,4 +12,7 @@ STRATEGY_CONFIG = {
         "sheet_name": "DMA_Data",
         "portfolio_tab": "Portfolio_500",
         "buy_tabs": ["Top_500_Stocks"],
-        "analyzer_class":
+        "analyzer_class": ConsolidateAnalyzer,
+        "sell_threshold_pct": 12
+    }
+}
