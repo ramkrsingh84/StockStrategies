@@ -103,3 +103,28 @@ elif authentication_status:
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
         st.subheader("📊 Unified Active Portfolio")
         st.dataframe(styled_df, width="stretch")
+        
+        # ✅ Sold holdings only
+        sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
+
+        # ✅ Calculate investment and realized value
+        sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
+        sold_df["RealizedValue"] = sold_df[col("sell_price")] * sold_df[col("buy_qty")]
+
+        total_investment = sold_df["Investment"].sum()
+        total_realized = sold_df["RealizedValue"].sum()
+        total_profit = total_realized - total_investment
+        profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
+
+        summary_df = pd.DataFrame({
+            "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %"],
+            "Value": [
+                f"₹{total_investment:,.2f}",
+                f"₹{total_realized:,.2f}",
+                f"₹{total_profit:,.2f}",
+                f"{profit_pct:.2f}%"
+            ]
+        })
+
+        st.subheader("💰 Realized Profit Summary")
+        st.table(summary_df)
