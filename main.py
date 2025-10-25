@@ -102,6 +102,9 @@ elif authentication_status:
 
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
         st.subheader("📊 Unified Active Portfolio")
+        refresh = st.button("🔄 Refresh Portfolio Data")
+        if refresh:
+            st.cache_data.clear()
         st.dataframe(styled_df, width="stretch")
         
         # ✅ Sold holdings only

@@ -35,7 +35,7 @@ class PortfolioManager:
             col("current_price")
         ])
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=True)
 def _load_raw_records(sheet_name, tab_name):
     client = gspread.service_account_from_dict(json.loads(st.secrets["GOOGLE_CREDS_JSON"]))
     sheet = client.open(sheet_name).worksheet(tab_name)

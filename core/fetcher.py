@@ -30,7 +30,7 @@ class DataFetcher:
 
         return df.dropna(subset=[col("ticker"), col("current_price")])
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=True)
 def _fetch_raw_data(sheet_name, tab_name):
     client = gspread.service_account_from_dict(json.loads(st.secrets["GOOGLE_CREDS_JSON"]))
     sheet = client.open(sheet_name).worksheet(tab_name)
