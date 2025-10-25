@@ -62,7 +62,7 @@ elif authentication_status:
                 st.success(f"✅ No BUY signals for {strategy}")
             else:
                 st.subheader(f"🟢 BUY Signals for {strategy}")
-                st.dataframe(buy_df, use_container_width=True)
+                st.dataframe(buy_df, width="stretch")
 
     # ✅ Portfolio tab with SELL triggers
     with tabs[-1]:

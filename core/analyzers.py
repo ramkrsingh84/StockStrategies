@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from .columns import col
+from core.columns import col
 
 class SignalAnalyzer:
     def __init__(self, sell_threshold_pct=12):

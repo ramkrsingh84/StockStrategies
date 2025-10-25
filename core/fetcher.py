@@ -2,7 +2,7 @@ import pandas as pd
 import gspread
 import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
-from .columns import col
+from core.columns import col
 import json
 
 class DataFetcher:
