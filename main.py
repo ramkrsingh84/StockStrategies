@@ -90,4 +90,4 @@ elif authentication_status:
 
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
         st.subheader("📊 Portfolio Summary")
-        st.dataframe(df, width="stretch")
+        st.dataframe(styled_df, width="stretch")
