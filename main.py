@@ -66,17 +66,29 @@ elif authentication_status:
 
     # ✅ Portfolio tab with SELL triggers
     with tabs[-1]:
-        # ✅ Load and merge all portfolios
-        all_portfolios = []
-        for strategy, config in STRATEGY_CONFIG.items():
-            runner = StrategyRunner(strategy, config)
-            df = runner.portfolio_mgr.load(config["portfolio_tab"])
-            df["Strategy"] = strategy  # optional: tag source strategy
-            all_portfolios.append(df)
+        st.subheader("📊 Unified Active Portfolio")
 
-        portfolio_df = pd.concat(all_portfolios, ignore_index=True)
+        # 🔄 Refresh button
+        if st.button("🔄 Refresh Portfolio Data"):
+            st.cache_data.clear()
+            st.session_state["last_refresh"] = pd.Timestamp.now()
 
-        # ✅ Remove sold tickers
+        # ⏱️ Show last refresh time
+        last_refresh = st.session_state.get("last_refresh", pd.Timestamp.now())
+        st.caption(f"Last refreshed: {last_refresh.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # 🌀 Load and merge all portfolios
+        with st.spinner("Loading portfolio data..."):
+            all_portfolios = []
+            for strategy, config in STRATEGY_CONFIG.items():
+                runner = StrategyRunner(strategy, config)
+                df = runner.portfolio_mgr.load(config["portfolio_tab"])
+                df["Strategy"] = strategy
+                all_portfolios.append(df)
+
+            portfolio_df = pd.concat(all_portfolios, ignore_index=True)
+
+        # ✅ Active holdings only
         active_df = portfolio_df[portfolio_df[col("sell_date")].isna()].copy()
 
         # ✅ Run SELL analysis
@@ -85,12 +97,11 @@ elif authentication_status:
         sell_df = pd.DataFrame(analyzer.signal_log)
         sell_df = sell_df[sell_df["Signal"] == "SELL"]
 
-        # ✅ Merge SELL triggers into portfolio
+        # ✅ Merge SELL triggers into active portfolio
         merged = active_df.merge(
             sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
             how="left",
-            left_on=col("ticker"),
-            right_on=col("ticker")
+            on=col("ticker")
         )
         merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
@@ -101,17 +112,11 @@ elif authentication_status:
             return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-        st.subheader("📊 Unified Active Portfolio")
-        refresh = st.button("🔄 Refresh Portfolio Data")
-        if refresh:
-            st.cache_data.clear()
         st.dataframe(styled_df, width="stretch")
-        
-        # ✅ Sold holdings only
-        sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
 
-        # ✅ Use correct column name for sell price
-        sell_price_col = "Sell Price"  # direct reference since it's not aliased in col()
+        # 💰 Realized profit summary from sold holdings
+        sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
+        sell_price_col = "Sell Price"
 
         if sell_price_col not in sold_df.columns:
             st.warning("⚠️ 'Sell Price' column missing in portfolio. Cannot compute realized profit.")
