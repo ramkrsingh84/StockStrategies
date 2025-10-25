@@ -107,24 +107,30 @@ elif authentication_status:
         # ✅ Sold holdings only
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
 
-        # ✅ Calculate investment and realized value
-        sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
-        sold_df["RealizedValue"] = sold_df[col("sell_price")] * sold_df[col("buy_qty")]
+        # ✅ Use correct column name for sell price
+        sell_price_col = "Sell Price"  # direct reference since it's not aliased in col()
 
-        total_investment = sold_df["Investment"].sum()
-        total_realized = sold_df["RealizedValue"].sum()
-        total_profit = total_realized - total_investment
-        profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
+        if sell_price_col not in sold_df.columns:
+            st.warning("⚠️ 'Sell Price' column missing in portfolio. Cannot compute realized profit.")
+        else:
+            sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
+            sold_df["RealizedValue"] = sold_df[sell_price_col] * sold_df[col("buy_qty")]
 
-        summary_df = pd.DataFrame({
-            "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %"],
-            "Value": [
-                f"₹{total_investment:,.2f}",
-                f"₹{total_realized:,.2f}",
-                f"₹{total_profit:,.2f}",
-                f"{profit_pct:.2f}%"
-            ]
-        })
+            total_investment = sold_df["Investment"].sum()
+            total_realized = sold_df["RealizedValue"].sum()
+            total_profit = total_realized - total_investment
+            profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
 
-        st.subheader("💰 Realized Profit Summary")
-        st.table(summary_df)
+            summary_df = pd.DataFrame({
+                "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %"],
+                "Value": [
+                    f"₹{total_investment:,.2f}",
+                    f"₹{total_realized:,.2f}",
+                    f"₹{total_profit:,.2f}",
+                    f"{profit_pct:.2f}%"
+                ]
+            })
+
+            st.subheader("💰 Realized Profit Summary")
+            st.table(summary_df)
+
