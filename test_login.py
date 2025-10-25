@@ -19,7 +19,7 @@ config = {
 }
 
 hashed_pw = stauth.Hasher(["yourpassword123"]).generate()
-print(hashed_pw)
+st.write("hashed_pw count:", hashed_pw)
 
 
 # ✅ Create authenticator
