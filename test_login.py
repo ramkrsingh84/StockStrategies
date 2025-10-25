@@ -18,6 +18,10 @@ config = {
     }
 }
 
+hashed_pw = stauth.Hasher(["yourpassword123"]).generate()
+print(hashed_pw)
+
+
 # ✅ Create authenticator
 authenticator = stauth.Authenticate(
     config["credentials"],
