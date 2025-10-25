@@ -9,13 +9,6 @@ import streamlit_authenticator as stauth
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
 
 
-
-
-
-# 🔽 Your full dashboard logic goes here
-
-
-#st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
 st.title("📈 DMA Signal Dashboard")
 
 # Session state setup
