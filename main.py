@@ -3,6 +3,8 @@ import pandas as pd
 from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 from core.columns import col
+import streamlit_authenticator as stauth
+
 
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
 
