@@ -10,6 +10,8 @@ class PortfolioManager:
     def __init__(self, sheet_name):
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds_json = os.getenv("GOOGLE_CREDS_JSON")
+        if creds_json is None:
+            raise ValueError("❌ GOOGLE_CREDS_JSON not found in environment. Check Secrets Manager.")
         creds_dict = json.loads(creds_json)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         self.client = gspread.authorize(creds)
