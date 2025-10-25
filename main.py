@@ -7,6 +7,9 @@ import streamlit_authenticator as stauth
 import yaml
 
 
+st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
+
+
 # ✅ Load config from secrets
 credentials = {
     "usernames": {
@@ -46,7 +49,7 @@ elif authentication_status:
     # 🔽 Your full dashboard logic goes here
 
 
-    st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
+    #st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
     st.title("📈 DMA Signal Dashboard")
 
     # Session state setup
