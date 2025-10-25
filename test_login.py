@@ -35,7 +35,7 @@ st.write("Rerun count:", st.session_state.counter)
 # ✅ Login widget
 name, authentication_status, username = authenticator.login("🔐 Login", "main")
 
-st.write("Rerun count:", st.session_state.counter)
+st.write("Rerun count after:", st.session_state.counter)
 
 # ✅ Handle login states
 if authentication_status is False:
