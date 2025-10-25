@@ -6,7 +6,7 @@ from core.columns import col
 import streamlit_authenticator as stauth
 
 
-# Build config manually from secrets
+# ✅ Build config manually from secrets
 usernames = {}
 for username in st.secrets["auth_users"]:
     user_data = st.secrets["auth_users"][username]
@@ -26,7 +26,7 @@ config = {
     }
 }
 
-# Create authenticator
+# ✅ Create authenticator
 authenticator = stauth.Authenticate(
     config,
     cookie_name=config["cookie"]["name"],
@@ -34,7 +34,7 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=config["cookie"]["expiry_days"]
 )
 
-# Login widget
+# ✅ Login widget
 name, auth_status, username = authenticator.login("🔐 Login", "main")
 
 if auth_status == False:
@@ -44,6 +44,7 @@ elif auth_status == None:
 elif auth_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
+
 
 
 
