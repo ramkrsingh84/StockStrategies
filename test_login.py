@@ -1,8 +1,7 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-import yaml
 
-# ✅ Load config
+# ✅ Hardcoded config
 config = {
     "credentials": {
         "usernames": {
@@ -27,7 +26,7 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-# ✅ Counter to test rerun
+# ✅ Rerun counter
 if "counter" not in st.session_state:
     st.session_state.counter = 0
 st.session_state.counter += 1
