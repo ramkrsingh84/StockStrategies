@@ -7,8 +7,8 @@ class StrategyRunner:
         self.name = name
         self.config = config
         self.analyzer = config["analyzer_class"](sell_threshold_pct=config.get("sell_threshold_pct", 12))
-        self.portfolio_mgr = PortfolioManager(config["sheet_name"], creds_file)
-        self.fetcher = DataFetcher(config["sheet_name"], creds_file)
+        self.portfolio_mgr = PortfolioManager(config["sheet_name"])
+        self.fetcher = DataFetcher(config["sheet_name"])
 
     def run(self):
         portfolio_df = self.portfolio_mgr.load(self.config["portfolio_tab"])

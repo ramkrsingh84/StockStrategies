@@ -2,11 +2,16 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from .columns import col
+import os
+import json
+
 
 class DataFetcher:
-    def __init__(self, sheet_name, creds_file):
+    def __init__(self, sheet_name):
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+        creds_json = os.getenv("GOOGLE_CREDS_JSON")
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         self.client = gspread.authorize(creds)
         self.sheet_name = sheet_name
 
