@@ -6,23 +6,24 @@ from core.columns import col
 import streamlit_authenticator as stauth
 
 
-# ✅ Build config manually from secrets
-usernames = {}
-for username in st.secrets["auth_users"]:
-    user_data = st.secrets["auth_users"][username]
-    usernames[username] = {
-        "name": user_data["name"],
-        "password": user_data["password"]
-    }
-
+# ✅ Inline config dictionary
 config = {
     "credentials": {
-        "usernames": usernames
+        "usernames": {
+            "ram": {
+                "name": "Ram",
+                "password": "yourpassword123"  # You can hash this later
+            },
+            "alice": {
+                "name": "Alice",
+                "password": "alicepass"
+            }
+        }
     },
     "cookie": {
-        "name": st.secrets["auth_cookie"]["name"],
-        "key": st.secrets["auth_cookie"]["key"],
-        "expiry_days": int(st.secrets["auth_cookie"]["expiry_days"])
+        "name": "auth_cookie",
+        "key": "dma_dashboard",
+        "expiry_days": 1
     }
 }
 
@@ -44,7 +45,6 @@ elif auth_status == None:
 elif auth_status:
     authenticator.logout("Logout", "sidebar")
     st.sidebar.success(f"Welcome, {name} 👋")
-
 
 
 
