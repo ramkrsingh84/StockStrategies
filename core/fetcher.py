@@ -15,10 +15,10 @@ class DataFetcher:
         self.sheet_name = sheet_name
 
     def fetch(self, tab_name):
-        return self._fetch_tab_data(self.sheet_name, tab_name, self.client)
+        return self._fetch_tab_data(_self.sheet_name, _tab_name, _self.client)
 
     @st.cache_data(ttl=300)  # ✅ Cache for 5 minutes
-    def _fetch_tab_data(sheet_name, tab_name, client):
+    def _fetch_tab_data(_sheet_name, _tab_name, _client):
         try:
             sheet = client.open(sheet_name).worksheet(tab_name)
             raw = sheet.get_all_values()

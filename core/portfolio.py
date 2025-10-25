@@ -12,10 +12,10 @@ class PortfolioManager:
         self.sheet_name = sheet_name
 
     def load(self, tab_name):
-        return self._load_tab_data(self.sheet_name, tab_name, self.client)
+        return self._load_tab_data(_self.sheet_name, _tab_name, _self.client)
 
     @st.cache_data(ttl=300)  # ✅ Cache for 5 minutes
-    def _load_tab_data(sheet_name, tab_name, client):
+    def _load_tab_data(_sheet_name, _tab_name, _client):
         try:
             sheet = client.open(sheet_name).worksheet(tab_name)
             df = pd.DataFrame(sheet.get_all_records())
