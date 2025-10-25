@@ -7,7 +7,7 @@ config = {
         "usernames": {
             "ram": {
                 "name": "Ram",
-                "password": "yourpassword123"
+                "password": "$2b$12$7/vrvC9sx0p5G2d1oWy99.6yO3ljyh5GHukGwLDYNCZwPveUoQmKC"
             }
         }
     },
