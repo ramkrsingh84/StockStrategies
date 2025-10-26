@@ -130,14 +130,24 @@ elif authentication_status:
             total_realized = sold_df["RealizedValue"].sum()
             total_profit = total_realized - total_investment
             profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
+            
+            # ✅ Load surcharges and sum all charges (no Buy/Sell filter)
+            surcharge_df = load_surcharges("Surcharges")
+            total_surcharge = surcharge_df["Charges"].sum() if "Charges" in surcharge_df.columns else 0
+
+            net_profit = total_profit - total_surcharge
+            net_profit_pct = (net_profit / total_investment * 100) if total_investment > 0 else 0
 
             summary_df = pd.DataFrame({
-                "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %"],
+                "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %", "Total Surcharges", "Net Profit", "Net Profit %" ],
                 "Value": [
                     f"₹{total_investment:,.2f}",
                     f"₹{total_realized:,.2f}",
                     f"₹{total_profit:,.2f}",
                     f"{profit_pct:.2f}%"
+                    f"₹{total_surcharge:,.2f}",
+                    f"₹{net_profit:,.2f}",
+                    f"{net_profit_pct:.2f}%"
                 ]
             })
 
