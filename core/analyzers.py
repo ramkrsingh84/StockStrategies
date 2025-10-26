@@ -25,7 +25,7 @@ class SignalAnalyzer:
         if df.empty:
             return
 
-        df["weighted_cost"] = df[col("buy_price")] * df[col("buy_qty")]
+        df.loc["weighted_cost"] = df[col("buy_price")] * df[col("buy_qty")]
         grouped = df.groupby(col("ticker")).agg({
             "weighted_cost": "sum",
             col("buy_qty"): "sum",
