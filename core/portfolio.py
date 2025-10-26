@@ -34,6 +34,16 @@ class PortfolioManager:
             col("buy_qty"),
             col("current_price")
         ])
+    def load_surcharges(self):
+        try:
+            sheet = self.client.open(self.sheet_name).worksheet("Surcharges")
+            records = sheet.get_all_records()
+            df = pd.DataFrame(records)
+            df["Charges"] = pd.to_numeric(df["Charges"], errors="coerce")
+            return df.dropna(subset=["Charges"])
+        except Exception as e:
+            st.warning(f"⚠️ Failed to load surcharges: {e}")
+            return pd.DataFrame(columns=["Date", "Type", "Charges", "Strategy"])
 
 @st.cache_data(ttl=300, show_spinner=True)
 def _load_raw_records(sheet_name, tab_name):
