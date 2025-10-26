@@ -70,6 +70,7 @@ elif authentication_status:
 
         # 🔄 Refresh button
         if st.button("🔄 Refresh Portfolio Data"):
+            refresh_all_sheets(STRATEGY_CONFIG)  # triggers dummy edit in "Refresh" sheet
             st.cache_data.clear()
             st.session_state["last_refresh"] = pd.Timestamp.now()
 
