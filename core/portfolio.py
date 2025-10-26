@@ -22,8 +22,8 @@ class PortfolioManager:
             return df
 
         df[col("ticker")] = df[col("ticker")].astype(str).str.upper()
-        df[col("sell_date")] = pd.to_datetime(df[col("sell_date")], errors="coerce").dt.date
-        df[col("buy_date")] = pd.to_datetime(df[col("buy_date")], errors="coerce").dt.date
+        df[col("sell_date")] = pd.to_datetime(df[col("sell_date")], errors="coerce", dayfirst=True).dt.date
+        df[col("buy_date")] = pd.to_datetime(df[col("buy_date")], errors="coerce", dayfirst=True).dt.date
 
         for c in [col("buy_price"), col("buy_qty"), col("current_price")]:
             df[c] = pd.to_numeric(df[c], errors="coerce")
