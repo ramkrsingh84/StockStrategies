@@ -116,6 +116,7 @@ elif authentication_status:
             merged_df = active_df.copy()
             merged_df["Highlight"] = "NORMAL"
 
+        
         # 📦 Consolidated Portfolio Summary
         if not merged_df.empty:
             consolidated = (
@@ -146,10 +147,16 @@ elif authentication_status:
                     "background-color: #ffe6e6" if row["Highlight"] == "SELL" else ""
                     for _ in row
                 ]
-
+            show_only_sell = st.checkbox("🔻 Show only SELL-triggered tickers")
+            
             st.subheader("📦 Consolidated Portfolio Summary")
+            filtered_consolidated = (
+                consolidated[consolidated["Highlight"] == "SELL"]
+                if show_only_sell else consolidated
+            )
+
             st.dataframe(
-                consolidated[
+                filtered_consolidated[
                     ["Ticker", "Strategy", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %", "Highlight"]
                 ]
                 .style
