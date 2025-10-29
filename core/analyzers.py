@@ -21,9 +21,9 @@ class SignalAnalyzer:
                 })
 
     def analyze_sell(self, df):
-        df = df[df[col("sell_date")].isna()]
-        if df.empty:
+        if df.empty or col("sell_date") not in df.columns:
             return
+        df = df[df[col("sell_date")].isna()]
 
         df = df.copy()
         df["weighted_cost"] = df[col("buy_price")] * df[col("buy_qty")]
