@@ -67,7 +67,7 @@ elif authentication_status:
 
     # ✅ Portfolio tab with SELL triggers
     with tabs[-1]:
-        st.subheader("📊 Unified Active Portfolio")
+        st.subheader("📊 Unified Portfolio Overview")
 
         # 🔄 Refresh button
         if st.button("🔄 Refresh Portfolio Data"):
@@ -99,29 +99,20 @@ elif authentication_status:
         sell_df = pd.DataFrame(analyzer.signal_log)
         sell_df = sell_df[sell_df["Signal"] == "SELL"]
 
-        # ✅ Merge SELL triggers into active portfolio
-        merged = active_df.merge(
-            sell_df[[col("ticker"), "Signal", "P&L %", "Price"]],
+        # ✅ Merge SELL triggers into active_df
+        active_df = active_df.merge(
+            sell_df[[col("ticker"), "Signal"]],
             how="left",
             on=col("ticker")
         )
-        merged["Highlight"] = merged["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+        active_df["Highlight"] = active_df["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-        show_only_sell = st.checkbox("🔻 Show only SELL-triggered holdings")
-        filtered_df = merged[merged["Highlight"] == "SELL"] if show_only_sell else merged
-
-        def highlight_sell(row):
-            return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
-
-        styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
-
-        # 📦 Consolidated Portfolio Summary by Ticker
+        # 📦 Consolidated Portfolio Summary
         if not active_df.empty:
             consolidated = (
                 active_df.copy()
                 .assign(weighted_cost=lambda df: df[col("buy_price")] * df[col("buy_qty")])
-                .groupby(col("ticker"))
+                .groupby([col("ticker"), "Strategy", "Highlight"], as_index=False)
                 .agg({
                     col("buy_qty"): "sum",
                     "weighted_cost": "sum",
@@ -140,11 +131,17 @@ elif authentication_status:
             consolidated["Profit"] = consolidated["Current Value"] - consolidated["Investment"]
             consolidated["Profit %"] = (consolidated["Profit"] / consolidated["Investment"]) * 100
 
+            def highlight_sell(row):
+                return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
+
             st.subheader("📦 Consolidated Portfolio Summary")
             st.dataframe(
                 consolidated[
-                    ["Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %"]
-                ].style.format({
+                    ["Ticker", "Strategy", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %"]
+                ]
+                .style
+                .apply(highlight_sell, axis=1)
+                .format({
                     "Avg Buy Price": "₹{:.2f}",
                     "Current Price": "₹{:.2f}",
                     "Investment": "₹{:.2f}",
@@ -176,7 +173,8 @@ elif authentication_status:
 
             net_profit = total_profit - total_surcharge
             net_profit_pct = (net_profit / total_investment * 100) if total_investment > 0 else 0
-            
+
+            # ✅ Add total investment across all holdings
             total_investment_all = portfolio_df[col("buy_price")].mul(portfolio_df[col("buy_qty")], fill_value=0).sum()
 
             summary_df = pd.DataFrame({
