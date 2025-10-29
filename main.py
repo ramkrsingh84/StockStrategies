@@ -71,7 +71,7 @@ elif authentication_status:
 
         # 🔄 Refresh button
         if st.button("🔄 Refresh Portfolio Data"):
-            refresh_all_sheets(STRATEGY_CONFIG)  # triggers dummy edit in "Refresh" sheet
+            refresh_all_sheets(STRATEGY_CONFIG)
             st.cache_data.clear()
             st.session_state["last_refresh"] = pd.Timestamp.now()
 
@@ -114,7 +114,46 @@ elif authentication_status:
             return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
 
         styled_df = filtered_df.style.apply(highlight_sell, axis=1)
-        st.dataframe(styled_df, width="stretch")
+        st.dataframe(styled_df, use_container_width=True)
+
+        # 📦 Consolidated Portfolio Summary by Ticker
+        if not active_df.empty:
+            consolidated = (
+                active_df.copy()
+                .assign(weighted_cost=lambda df: df[col("buy_price")] * df[col("buy_qty")])
+                .groupby(col("ticker"))
+                .agg({
+                    col("buy_qty"): "sum",
+                    "weighted_cost": "sum",
+                    col("current_price"): "first"
+                })
+                .rename(columns={
+                    col("buy_qty"): "Total Qty",
+                    "weighted_cost": "Total Cost",
+                    col("current_price"): "Current Price"
+                })
+            )
+
+            consolidated["Avg Buy Price"] = consolidated["Total Cost"] / consolidated["Total Qty"]
+            consolidated["Investment"] = consolidated["Avg Buy Price"] * consolidated["Total Qty"]
+            consolidated["Current Value"] = consolidated["Current Price"] * consolidated["Total Qty"]
+            consolidated["Profit"] = consolidated["Current Value"] - consolidated["Investment"]
+            consolidated["Profit %"] = (consolidated["Profit"] / consolidated["Investment"]) * 100
+
+            st.subheader("📦 Consolidated Portfolio Summary")
+            st.dataframe(
+                consolidated[
+                    ["Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %"]
+                ].style.format({
+                    "Avg Buy Price": "₹{:.2f}",
+                    "Current Price": "₹{:.2f}",
+                    "Investment": "₹{:.2f}",
+                    "Current Value": "₹{:.2f}",
+                    "Profit": "₹{:.2f}",
+                    "Profit %": "{:.2f}%"
+                }),
+                use_container_width=True
+            )
 
         # 💰 Realized profit summary from sold holdings
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
@@ -130,17 +169,29 @@ elif authentication_status:
             total_realized = sold_df["RealizedValue"].sum()
             total_profit = total_realized - total_investment
             profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
-            
-            # ✅ Load surcharges and sum all charges (no Buy/Sell filter)
+
+            # ✅ Load surcharges and sum all charges
             surcharge_df = runner.portfolio_mgr.load_surcharges()
             total_surcharge = surcharge_df["Charges"].sum() if "Charges" in surcharge_df.columns else 0
 
             net_profit = total_profit - total_surcharge
             net_profit_pct = (net_profit / total_investment * 100) if total_investment > 0 else 0
+            
+            total_investment_all = portfolio_df[col("buy_price")].mul(portfolio_df[col("buy_qty")], fill_value=0).sum()
 
             summary_df = pd.DataFrame({
-                "Metric": ["Total Investment (Sold)", "Realized Value", "Profit Earned", "Profit %", "Total Surcharges", "Net Profit", "Net Profit %" ],
+                "Metric": [
+                    "Total Investment (All)",
+                    "Total Investment (Sold)",
+                    "Realized Value",
+                    "Profit Earned",
+                    "Profit %",
+                    "Total Surcharges",
+                    "Net Profit",
+                    "Net Profit %"
+                ],
                 "Value": [
+                    f"₹{total_investment_all:,.2f}",
                     f"₹{total_investment:,.2f}",
                     f"₹{total_realized:,.2f}",
                     f"₹{total_profit:,.2f}",
