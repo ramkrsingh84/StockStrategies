@@ -99,16 +99,22 @@ elif authentication_status:
         sell_df = pd.DataFrame(analyzer.signal_log)
         sell_df = sell_df[sell_df["Signal"] == "SELL"]
 
-        # ✅ Merge SELL triggers into active_df
-        if not sell_df.empty and "Signal" in sell_df.columns:
+        # ✅ Safe Merge SELL triggers into active_df
+        if (
+            not sell_df.empty and
+            "Signal" in sell_df.columns and
+            col("ticker") in sell_df.columns and
+            col("ticker") in active_df.columns
+        ):
             active_df = active_df.merge(
                 sell_df[[col("ticker"), "Signal"]],
                 how="left",
                 on=col("ticker")
             )
-            active_df["Highlight"] = active_df["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+            active_df["Highlight"] = active_df["Signal"].fillna("NORMAL").apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
         else:
             active_df["Highlight"] = "NORMAL"
+
 
 
         # 📦 Consolidated Portfolio Summary with SELL Highlights
