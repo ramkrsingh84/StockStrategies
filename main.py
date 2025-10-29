@@ -107,8 +107,17 @@ elif authentication_status:
         )
         active_df["Highlight"] = active_df["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
 
-        # 📦 Consolidated Portfolio Summary
+        # 📦 Consolidated Portfolio Summary with SELL Highlights
         if not active_df.empty:
+            # Merge SELL triggers into active_df
+            active_df = active_df.merge(
+                sell_df[[col("ticker"), "Signal"]],
+                how="left",
+                on=col("ticker")
+            )
+            active_df["Highlight"] = active_df["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+
+            # Group by Ticker + Strategy + Highlight
             consolidated = (
                 active_df.copy()
                 .assign(weighted_cost=lambda df: df[col("buy_price")] * df[col("buy_qty")])
@@ -119,6 +128,7 @@ elif authentication_status:
                     col("current_price"): "first"
                 })
                 .rename(columns={
+                    col("ticker"): "Ticker",
                     col("buy_qty"): "Total Qty",
                     "weighted_cost": "Total Cost",
                     col("current_price"): "Current Price"
@@ -132,12 +142,15 @@ elif authentication_status:
             consolidated["Profit %"] = (consolidated["Profit"] / consolidated["Investment"]) * 100
 
             def highlight_sell(row):
-                return ["background-color: #ffe6e6" if row["Highlight"] == "SELL" else "" for _ in row]
+                return [
+                    "background-color: #ffe6e6" if row["Highlight"] == "SELL" else ""
+                    for _ in row
+                ]
 
             st.subheader("📦 Consolidated Portfolio Summary")
             st.dataframe(
                 consolidated[
-                    ["Ticker", "Strategy", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %"]
+                    ["Ticker", "Strategy", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %", "Highlight"]
                 ]
                 .style
                 .apply(highlight_sell, axis=1)
