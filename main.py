@@ -99,37 +99,27 @@ elif authentication_status:
         sell_df = pd.DataFrame(analyzer.signal_log)
         sell_df = sell_df[sell_df["Signal"] == "SELL"]
 
-        # ✅ Safe Merge SELL triggers into active_df
+        # ✅ Safe SELL trigger merge
         if (
             not sell_df.empty and
             "Signal" in sell_df.columns and
             col("ticker") in sell_df.columns and
             col("ticker") in active_df.columns
         ):
-            active_df = active_df.merge(
+            merged_df = active_df.merge(
                 sell_df[[col("ticker"), "Signal"]],
                 how="left",
                 on=col("ticker")
             )
-            active_df["Highlight"] = active_df["Signal"].fillna("NORMAL").apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
+            merged_df["Highlight"] = merged_df["Signal"].fillna("NORMAL").apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
         else:
-            active_df["Highlight"] = "NORMAL"
+            merged_df = active_df.copy()
+            merged_df["Highlight"] = "NORMAL"
 
-
-
-        # 📦 Consolidated Portfolio Summary with SELL Highlights
-        if not active_df.empty:
-            # Merge SELL triggers into active_df
-            active_df = active_df.merge(
-                sell_df[[col("ticker"), "Signal"]],
-                how="left",
-                on=col("ticker")
-            )
-            active_df["Highlight"] = active_df["Signal"].apply(lambda x: "SELL" if x == "SELL" else "NORMAL")
-
-            # Group by Ticker + Strategy + Highlight
+        # 📦 Consolidated Portfolio Summary
+        if not merged_df.empty:
             consolidated = (
-                active_df.copy()
+                merged_df.copy()
                 .assign(weighted_cost=lambda df: df[col("buy_price")] * df[col("buy_qty")])
                 .groupby([col("ticker"), "Strategy", "Highlight"], as_index=False)
                 .agg({
