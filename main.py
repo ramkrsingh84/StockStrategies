@@ -145,6 +145,7 @@ elif authentication_status:
             consolidated["Current Value"] = consolidated["Current Price"] * consolidated["Total Qty"]
             consolidated["Profit"] = consolidated["Current Value"] - consolidated["Investment"]
             consolidated["Profit %"] = (consolidated["Profit"] / consolidated["Investment"]) * 100
+            consolidated["Target Price (12%)"] = consolidated["Avg Buy Price"] * 1.12
 
             def highlight_sell(row):
                 return [
@@ -161,13 +162,14 @@ elif authentication_status:
 
             st.dataframe(
                 filtered_consolidated[
-                    ["Ticker", "Profit %", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Highlight", "Strategy"]
+                    ["Ticker", "Profit %", "Target Price (12%)", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Highlight", "Strategy"]
                 ]
                 .style
                 .apply(highlight_sell, axis=1)
                 .format({
                     "Avg Buy Price": "₹{:.2f}",
                     "Current Price": "₹{:.2f}",
+                    "Target Price (12%)": "₹{:.2f}",
                     "Investment": "₹{:.2f}",
                     "Current Value": "₹{:.2f}",
                     "Profit": "₹{:.2f}",
