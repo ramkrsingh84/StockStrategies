@@ -205,7 +205,7 @@ elif authentication_status:
             net_profit_pct = (net_profit / total_investment * 100) if total_investment > 0 else 0
 
             # ✅ Add total investment across all holdings
-            total_investment_all = portfolio_df[col("buy_price")].mul(portfolio_df[col("buy_qty")], fill_value=0).sum()
+            total_investment_all = active_df[col("buy_price")].mul(active_df[col("buy_qty")], fill_value=0).sum()
 
             summary_df = pd.DataFrame({
                 "Metric": [
