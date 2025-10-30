@@ -57,7 +57,10 @@ elif authentication_status:
         with tabs[i]:
             runner = StrategyRunner(strategy, STRATEGY_CONFIG[strategy])
             result_df = runner.run()
-            buy_df = result_df[result_df["Signal"] == "BUY"]
+            if "Signal" in result_df.columns:
+                buy_df = result_df[result_df["Signal"] == "BUY"]
+            else:
+                buy_df = pd.DataFrame()
 
             if buy_df.empty:
                 st.success(f"✅ No BUY signals for {strategy}")
