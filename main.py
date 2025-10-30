@@ -161,7 +161,7 @@ elif authentication_status:
 
             st.dataframe(
                 filtered_consolidated[
-                    ["Ticker", "Strategy", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Profit %", "Highlight"]
+                    ["Ticker", "Profit %", "Total Qty", "Avg Buy Price", "Current Price", "Investment", "Current Value", "Profit", "Highlight", "Strategy"]
                 ]
                 .style
                 .apply(highlight_sell, axis=1)
