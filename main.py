@@ -97,7 +97,11 @@ elif authentication_status:
         analyzer = list(STRATEGY_CONFIG.values())[0]["analyzer_class"]()
         analyzer.analyze_sell(active_df)
         sell_df = pd.DataFrame(analyzer.signal_log)
-        sell_df = sell_df[sell_df["Signal"] == "SELL"]
+        if "Signal" in sell_df.columns:
+            sell_df = sell_df[sell_df["Signal"] == "SELL"]
+        else:
+            sell_df = pd.DataFrame()  # fallback to empty DataFrame
+
 
         # ✅ Safe SELL trigger merge
         if (
