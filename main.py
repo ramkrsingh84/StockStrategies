@@ -140,6 +140,7 @@ elif authentication_status:
                 })
             )
 
+            consolidated["Total Qty"] = consolidated["Total Qty"].astype(int)
             consolidated["Avg Buy Price"] = consolidated["Total Cost"] / consolidated["Total Qty"]
             consolidated["Investment"] = consolidated["Avg Buy Price"] * consolidated["Total Qty"]
             consolidated["Current Value"] = consolidated["Current Price"] * consolidated["Total Qty"]
