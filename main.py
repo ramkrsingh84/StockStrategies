@@ -266,7 +266,6 @@ elif authentication_status:
             (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB")
         ])
         
-        st.write("🔍 Raw All portfolio entry:", portfolio_df[])
         
         #delete after debugging
         st.write("📦 In sold_df:", sold_df[
