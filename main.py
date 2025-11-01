@@ -244,18 +244,15 @@ elif authentication_status:
         
         #delete after debugging
         st.write("🔍 Raw portfolio entry:", portfolio_df[
-            (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-            (portfolio_df[col("buy_date")] == pd.to_datetime("2024-08-20"))
+            (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB")
         ])
         #delete after debugging
         st.write("📦 In sold_df:", sold_df[
-            (sold_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-            (sold_df[col("buy_date")] == pd.to_datetime("2024-08-20"))
+            (sold_df[col("ticker")] == "NSE:IDFCFIRSTB")
         ])
         #delete after debugging
         st.write("📦 In active_df:", active_df[
-            (active_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-            (active_df[col("buy_date")] == pd.to_datetime("2024-08-20"))
+            (active_df[col("ticker")] == "NSE:IDFCFIRSTB")
         ])
 
 
