@@ -233,7 +233,42 @@ elif authentication_status:
 
             st.subheader("💰 Realized Profit Summary")
             st.table(summary_df)
-            
+ 
+        with st.expander("🧪 FD Return Validation Table (Temporary)"):
+            st.caption("This table compares each active holding's current value vs FD return. For validation only.")
+
+            # 🔧 Adjustable FD rate (separate key to avoid conflict)
+            fd_rate_validation = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5, key="fd_rate_validation")
+
+            # ✅ Convert buy_date to datetime
+            active_df[col("buy_date")] = pd.to_datetime(active_df[col("buy_date")], errors="coerce")
+
+            # ✅ Calculate holding duration till today
+            active_df["Days Held"] = (pd.Timestamp.now() - active_df[col("buy_date")]).dt.days.clip(lower=1)
+
+            # ✅ Calculate investment and FD return
+            active_df["Investment"] = active_df[col("buy_price")] * active_df[col("buy_qty")]
+            active_df["FD Return"] = active_df["Investment"] * (1 + (fd_rate_validation / 100) * active_df["Days Held"] / 365)
+            active_df["Current Value"] = active_df[col("current_price")] * active_df[col("buy_qty")]
+            active_df["Underperforming FD"] = active_df["Current Value"] < active_df["FD Return"]
+
+            # ✅ Display validation table
+            st.dataframe(
+                active_df[
+                    [col("ticker"), col("buy_date"), col("buy_price"), col("buy_qty"), col("current_price"), "Investment", "FD Return", "Current Value", "Days Held", "Underperforming FD"]
+                ]
+                .style
+                .format({
+                    col("buy_price"): "₹{:.2f}",
+                    col("current_price"): "₹{:.2f}",
+                    "Investment": "₹{:.2f}",
+                    "FD Return": "₹{:.2f}",
+                    "Current Value": "₹{:.2f}",
+                    "Days Held": "{:.0f}"
+                }),
+                use_container_width=True
+            )
+ 
     # ✅ FD Benchmark Comparison tab
     with tabs[-1]:
         st.subheader("📈 Strategy vs FD Benchmark")
@@ -242,40 +277,6 @@ elif authentication_status:
         fd_rate = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5)
         show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
         
-        #delete after debugging
-        
-        st.subheader("🧾 Ticker + Buy Date Audit")
-
-        # Show all tickers with their buy dates and raw types
-        audit_df = portfolio_df[[col("ticker"), col("buy_date")]].copy()
-        audit_df["Buy Date Raw"] = portfolio_df[col("buy_date")]
-        audit_df["Buy Date Type"] = audit_df["Buy Date Raw"].apply(lambda x: type(x).__name__)
-
-        # Optional: sort for clarity
-        audit_df = audit_df.sort_values(by=[col("ticker"), col("buy_date")], ascending=True)
-
-        st.dataframe(audit_df, use_container_width=True)
-
-        
-        st.write("🔍 Raw portfolio entry:", portfolio_df[
-            (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-            (portfolio_df[col("buy_date")] == pd.to_datetime("20-08-2024"))
-        ])
-        
-        st.write("🔍 Raw All portfolio entry:", portfolio_df[
-            (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB")
-        ])
-        
-        
-        #delete after debugging
-        st.write("📦 In sold_df:", sold_df[
-            (sold_df[col("ticker")] == "NSE:IDFCFIRSTB")
-        ])
-        #delete after debugging
-        st.write("📦 In active_df:", active_df[
-            (active_df[col("ticker")] == "NSE:IDFCFIRSTB")
-        ])
-
 
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
         sell_price_col = "Sell Price"
@@ -290,14 +291,7 @@ elif authentication_status:
             # ✅ Fix datetime issues
             sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
             sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
-            
-            # After datetime conversion #delete after debugging
-            invalid_dates = portfolio_df[
-                (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-                (portfolio_df[col("buy_date")].isna() | portfolio_df[col("sell_date")].isna())
-            ]
-            st.write("⚠️ Dropped due to invalid dates:", invalid_dates)
-            
+                       
             
             sold_df = sold_df[sold_df[col("buy_date")].notna() & sold_df[col("sell_date")].notna()]
 
@@ -323,11 +317,6 @@ elif authentication_status:
                 })
                 .rename(columns={col("ticker"): "Ticker"})
             )
-            
-            #delete after debugging
-            st.write("📈 In FD benchmark:", benchmark_df[
-                benchmark_df["Ticker"] == "NSE:IDFCFIRSTB"
-            ])
 
 
             benchmark_df["Strategy %"] = (benchmark_df["Strategy Profit"] / benchmark_df["Investment"]) * 100
