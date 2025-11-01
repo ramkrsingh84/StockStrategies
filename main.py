@@ -240,6 +240,9 @@ elif authentication_status:
         fd_rate = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5)
         show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
 
+        sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
+        sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
+
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
 
         if sell_price_col not in sold_df.columns:
