@@ -49,7 +49,7 @@ elif authentication_status:
     # ✅ Tabs setup (only visible after login)
     tabs = st.tabs(
         [f"🟢 {strategy} BUY Signals" for strategy in STRATEGY_CONFIG.keys()] +
-        ["📊 Portfolio with SELL Triggers", "📈 FD Benchmark Comparison]
+        ["📊 Portfolio with SELL Triggers", "📈 FD Benchmark Comparison"]
     )
 
     # ✅ BUY signal tabs
