@@ -241,6 +241,23 @@ elif authentication_status:
         # 🔧 Adjustable FD rate
         fd_rate = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5)
         show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
+        
+        #delete after debugging
+        st.write("🔍 Raw portfolio entry:", portfolio_df[
+            (portfolio_df[col("ticker")] == "IDFCFIRSTB") &
+            (portfolio_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
+        ])
+        #delete after debugging
+        st.write("📦 In sold_df:", sold_df[
+            (sold_df[col("ticker")] == "IDFCFIRSTB") &
+            (sold_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
+        ])
+        #delete after debugging
+        st.write("📦 In active_df:", active_df[
+            (active_df[col("ticker")] == "IDFCFIRSTB") &
+            (active_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
+        ])
+
 
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
         sell_price_col = "Sell Price"
@@ -255,6 +272,15 @@ elif authentication_status:
             # ✅ Fix datetime issues
             sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
             sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
+            
+            # After datetime conversion #delete after debugging
+            invalid_dates = portfolio_df[
+                (portfolio_df[col("ticker")] == "TCS") &
+                (portfolio_df[col("buy_date")].isna() | portfolio_df[col("sell_date")].isna())
+            ]
+            st.write("⚠️ Dropped due to invalid dates:", invalid_dates)
+            
+            
             sold_df = sold_df[sold_df[col("buy_date")].notna() & sold_df[col("sell_date")].notna()]
 
             # ✅ Calculate duration
@@ -279,6 +305,12 @@ elif authentication_status:
                 })
                 .rename(columns={col("ticker"): "Ticker"})
             )
+            
+            #delete after debugging
+            st.write("📈 In FD benchmark:", benchmark_df[
+                benchmark_df["Ticker"] == "IDFCFIRSTB"
+            ])
+
 
             benchmark_df["Strategy %"] = (benchmark_df["Strategy Profit"] / benchmark_df["Investment"]) * 100
             benchmark_df["FD %"] = (benchmark_df["FD Profit"] / benchmark_df["Investment"]) * 100
