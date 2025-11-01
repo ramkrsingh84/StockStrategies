@@ -245,7 +245,7 @@ elif authentication_status:
         #delete after debugging
         st.write("🔍 Raw portfolio entry:", portfolio_df[
             (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
-            (portfolio_df[col("buy_date")] == pd.to_datetime("2024-08-20"))
+            (portfolio_df[col("buy_date")] == pd.to_datetime("20-08-2024"))
         ])
         
         st.write("🔍 Raw All portfolio entry:", portfolio_df[
