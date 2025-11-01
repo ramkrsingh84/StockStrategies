@@ -49,7 +49,7 @@ elif authentication_status:
     # ✅ Tabs setup (only visible after login)
     tabs = st.tabs(
         [f"🟢 {strategy} BUY Signals" for strategy in STRATEGY_CONFIG.keys()] +
-        ["📊 Portfolio with SELL Triggers"]
+        ["📊 Portfolio with SELL Triggers", "📈 FD Benchmark Comparison]
     )
 
     # ✅ BUY signal tabs
@@ -232,4 +232,81 @@ elif authentication_status:
 
             st.subheader("💰 Realized Profit Summary")
             st.table(summary_df)
+            
+    # ✅ FD Benchmark Comparison tab
+    with tabs[-1]:
+        st.subheader("📈 Strategy vs FD Benchmark")
+
+        fd_rate = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5)
+        show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
+
+        sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
+
+        if sell_price_col not in sold_df.columns:
+            st.warning("⚠️ 'Sell Price' column missing. Cannot compute benchmark.")
+        else:
+            sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
+            sold_df["RealizedValue"] = sold_df[sell_price_col] * sold_df[col("buy_qty")]
+            sold_df["Days Held"] = (sold_df[col("sell_date")] - sold_df[col("buy_date")]).dt.days.clip(lower=1)
+
+            sold_df["FD Return"] = sold_df["Investment"] * (1 + (fd_rate / 100) * sold_df["Days Held"] / 365)
+            sold_df["Strategy Profit"] = sold_df["RealizedValue"] - sold_df["Investment"]
+            sold_df["FD Profit"] = sold_df["FD Return"] - sold_df["Investment"]
+            sold_df["Excess Profit"] = sold_df["Strategy Profit"] - sold_df["FD Profit"]
+
+            benchmark_df = (
+                sold_df.groupby(col("ticker"), as_index=False)
+                .agg({
+                    "Investment": "sum",
+                    "RealizedValue": "sum",
+                    "FD Return": "sum",
+                    "Strategy Profit": "sum",
+                    "FD Profit": "sum",
+                    "Excess Profit": "sum"
+                })
+                .rename(columns={col("ticker"): "Ticker"})
+            )
+
+            benchmark_df["Strategy %"] = (benchmark_df["Strategy Profit"] / benchmark_df["Investment"]) * 100
+            benchmark_df["FD %"] = (benchmark_df["FD Profit"] / benchmark_df["Investment"]) * 100
+            benchmark_df["Excess %"] = benchmark_df["Strategy %"] - benchmark_df["FD %"]
+
+            if show_outperformers_only:
+                benchmark_df = benchmark_df[benchmark_df["Excess Profit"] > 0]
+
+            st.dataframe(
+                benchmark_df[
+                    ["Ticker", "Investment", "RealizedValue", "FD Return", "Strategy Profit", "FD Profit", "Excess Profit", "Strategy %", "FD %", "Excess %"]
+                ]
+                .style
+                .format({
+                    "Investment": "₹{:.2f}",
+                    "RealizedValue": "₹{:.2f}",
+                    "FD Return": "₹{:.2f}",
+                    "Strategy Profit": "₹{:.2f}",
+                    "FD Profit": "₹{:.2f}",
+                    "Excess Profit": "₹{:.2f}",
+                    "Strategy %": "{:.2f}%",
+                    "FD %": "{:.2f}%",
+                    "Excess %": "{:.2f}%"
+                }),
+                width="stretch"
+            )
+
+            # 📊 Bar chart: Strategy vs FD Profit
+            import matplotlib.pyplot as plt
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+            bars = ax.barh(
+                benchmark_df["Ticker"],
+                benchmark_df["Strategy Profit"],
+                color=["green" if s > f else "red" for s, f in zip(benchmark_df["Strategy Profit"], benchmark_df["FD Profit"])]
+            )
+
+            for bar, value in zip(bars, benchmark_df["Strategy Profit"]):
+                ax.text(bar.get_width(), bar.get_y() + bar.get_height()/2, f"₹{value:,.0f}", va='center')
+
+            ax.set_xlabel("Profit (₹)")
+            ax.set_title("Strategy vs FD Profit by Ticker")
+            st.pyplot(fig)
 
