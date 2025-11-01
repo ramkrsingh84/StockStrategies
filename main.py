@@ -351,19 +351,38 @@ elif authentication_status:
                 width="stretch"
             )
 
-            # 📊 Bar chart: Strategy vs FD Profit
+            # 📊 Grouped Bar Chart: Strategy vs FD Profit
 
-            fig, ax = plt.subplots(figsize=(8, 6))
-            bars = ax.barh(
-                benchmark_df["Ticker"],
-                benchmark_df["Strategy Profit"],
-                color=["green" if s > f else "red" for s, f in zip(benchmark_df["Strategy Profit"], benchmark_df["FD Profit"])]
-            )
+            tickers = benchmark_df["Ticker"]
+            strategy_profit = benchmark_df["Strategy Profit"]
+            fd_profit = benchmark_df["FD Profit"]
 
-            for bar, value in zip(bars, benchmark_df["Strategy Profit"]):
-                ax.text(bar.get_width(), bar.get_y() + bar.get_height()/2, f"₹{value:,.0f}", va='center')
+            x = np.arange(len(tickers))  # label locations
+            width = 0.35  # width of the bars
 
-            ax.set_xlabel("Profit (₹)")
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            bars1 = ax.bar(x - width/2, strategy_profit, width, label="Strategy", color="green")
+            bars2 = ax.bar(x + width/2, fd_profit, width, label="FD", color="gray")
+
+            # ✅ Annotate bars
+            for bar in bars1:
+                height = bar.get_height()
+                ax.annotate(f'₹{height:,.0f}', xy=(bar.get_x() + bar.get_width()/2, height),
+                            xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
+
+            for bar in bars2:
+                height = bar.get_height()
+                ax.annotate(f'₹{height:,.0f}', xy=(bar.get_x() + bar.get_width()/2, height),
+                            xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
+
+            # ✅ Axis and legend
+            ax.set_ylabel("Profit (₹)")
             ax.set_title("Strategy vs FD Profit by Ticker")
+            ax.set_xticks(x)
+            ax.set_xticklabels(tickers, rotation=45, ha="right")
+            ax.legend()
+
             st.pyplot(fig)
+
 
