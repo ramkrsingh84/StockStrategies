@@ -244,17 +244,17 @@ elif authentication_status:
         
         #delete after debugging
         st.write("🔍 Raw portfolio entry:", portfolio_df[
-            (portfolio_df[col("ticker")] == "IDFCFIRSTB") &
+            (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
             (portfolio_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
         ])
         #delete after debugging
         st.write("📦 In sold_df:", sold_df[
-            (sold_df[col("ticker")] == "IDFCFIRSTB") &
+            (sold_df[col("ticker")] == "NSE:IDFCFIRSTB") &
             (sold_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
         ])
         #delete after debugging
         st.write("📦 In active_df:", active_df[
-            (active_df[col("ticker")] == "IDFCFIRSTB") &
+            (active_df[col("ticker")] == "NSE:IDFCFIRSTB") &
             (active_df[col("buy_date")] == pd.to_datetime("2025-10-30"))
         ])
 
@@ -275,7 +275,7 @@ elif authentication_status:
             
             # After datetime conversion #delete after debugging
             invalid_dates = portfolio_df[
-                (portfolio_df[col("ticker")] == "TCS") &
+                (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
                 (portfolio_df[col("buy_date")].isna() | portfolio_df[col("sell_date")].isna())
             ]
             st.write("⚠️ Dropped due to invalid dates:", invalid_dates)
@@ -308,7 +308,7 @@ elif authentication_status:
             
             #delete after debugging
             st.write("📈 In FD benchmark:", benchmark_df[
-                benchmark_df["Ticker"] == "IDFCFIRSTB"
+                benchmark_df["Ticker"] == "NSE:IDFCFIRSTB"
             ])
 
 
