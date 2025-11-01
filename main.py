@@ -5,6 +5,7 @@ from core.runner import StrategyRunner
 from core.columns import col
 from core.utils import refresh_all_sheets
 import streamlit_authenticator as stauth
+import matplotlib.pyplot as plt
 
 
 st.set_page_config(page_title="DMA Signal Dashboard", layout="centered")
