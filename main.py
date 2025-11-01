@@ -237,26 +237,35 @@ elif authentication_status:
     with tabs[-1]:
         st.subheader("📈 Strategy vs FD Benchmark")
 
+        # 🔧 Adjustable FD rate
         fd_rate = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5)
         show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
 
-        sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
-        sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
-
         sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
+        sell_price_col = "Sell Price"
 
         if sell_price_col not in sold_df.columns:
             st.warning("⚠️ 'Sell Price' column missing. Cannot compute benchmark.")
         else:
+            # ✅ Core calculations
             sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
             sold_df["RealizedValue"] = sold_df[sell_price_col] * sold_df[col("buy_qty")]
+
+            # ✅ Fix datetime issues
+            sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
+            sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
+            sold_df = sold_df[sold_df[col("buy_date")].notna() & sold_df[col("sell_date")].notna()]
+
+            # ✅ Calculate duration
             sold_df["Days Held"] = (sold_df[col("sell_date")] - sold_df[col("buy_date")]).dt.days.clip(lower=1)
 
+            # ✅ FD return and comparison
             sold_df["FD Return"] = sold_df["Investment"] * (1 + (fd_rate / 100) * sold_df["Days Held"] / 365)
             sold_df["Strategy Profit"] = sold_df["RealizedValue"] - sold_df["Investment"]
             sold_df["FD Profit"] = sold_df["FD Return"] - sold_df["Investment"]
             sold_df["Excess Profit"] = sold_df["Strategy Profit"] - sold_df["FD Profit"]
 
+            # ✅ Group by ticker
             benchmark_df = (
                 sold_df.groupby(col("ticker"), as_index=False)
                 .agg({
@@ -274,9 +283,11 @@ elif authentication_status:
             benchmark_df["FD %"] = (benchmark_df["FD Profit"] / benchmark_df["Investment"]) * 100
             benchmark_df["Excess %"] = benchmark_df["Strategy %"] - benchmark_df["FD %"]
 
+            # ✅ Filter if needed
             if show_outperformers_only:
                 benchmark_df = benchmark_df[benchmark_df["Excess Profit"] > 0]
 
+            # ✅ Display table
             st.dataframe(
                 benchmark_df[
                     ["Ticker", "Investment", "RealizedValue", "FD Return", "Strategy Profit", "FD Profit", "Excess Profit", "Strategy %", "FD %", "Excess %"]
