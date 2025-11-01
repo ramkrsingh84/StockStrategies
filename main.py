@@ -234,36 +234,40 @@ elif authentication_status:
             st.subheader("💰 Realized Profit Summary")
             st.table(summary_df)
  
-        with st.expander("🧪 FD Return Validation Table (Temporary)"):
-            st.caption("This table compares each active holding's current value vs FD return. For validation only.")
+        with st.expander("🧪 FD Return vs Realized Value (Sold Only)"):
+            st.caption("Validation table for sold entries comparing FD return vs actual realized value.")
 
-            # 🔧 Adjustable FD rate (separate key to avoid conflict)
-            fd_rate_validation = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5, key="fd_rate_validation")
+            # 🔧 Adjustable FD rate
+            fd_rate_sold = st.slider("FD Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.0, step=0.5, key="fd_rate_sold")
 
-            # ✅ Convert buy_date to datetime
-            active_df[col("buy_date")] = pd.to_datetime(active_df[col("buy_date")], errors="coerce")
+            # ✅ Filter sold entries
+            sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
+            sell_price_col = "Sell Price"
 
-            # ✅ Calculate holding duration till today
-            active_df["Days Held"] = (pd.Timestamp.now() - active_df[col("buy_date")]).dt.days.clip(lower=1)
+            # ✅ Convert dates
+            sold_df[col("buy_date")] = pd.to_datetime(sold_df[col("buy_date")], errors="coerce")
+            sold_df[col("sell_date")] = pd.to_datetime(sold_df[col("sell_date")], errors="coerce")
+            sold_df = sold_df[sold_df[col("buy_date")].notna() & sold_df[col("sell_date")].notna()]
 
-            # ✅ Calculate investment and FD return
-            active_df["Investment"] = active_df[col("buy_price")] * active_df[col("buy_qty")]
-            active_df["FD Return"] = active_df["Investment"] * (1 + (fd_rate_validation / 100) * active_df["Days Held"] / 365)
-            active_df["Current Value"] = active_df[col("current_price")] * active_df[col("buy_qty")]
-            active_df["Underperforming FD"] = active_df["Current Value"] < active_df["FD Return"]
+            # ✅ Core calculations
+            sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
+            sold_df["RealizedValue"] = sold_df[sell_price_col] * sold_df[col("buy_qty")]
+            sold_df["Days Held"] = (sold_df[col("sell_date")] - sold_df[col("buy_date")]).dt.days.clip(lower=1)
+            sold_df["FD Return"] = sold_df["Investment"] * (1 + (fd_rate_sold / 100) * sold_df["Days Held"] / 365)
+            sold_df["Underperforming FD"] = sold_df["RealizedValue"] < sold_df["FD Return"]
 
             # ✅ Display validation table
             st.dataframe(
-                active_df[
-                    [col("ticker"), col("buy_date"), col("buy_price"), col("buy_qty"), col("current_price"), "Investment", "FD Return", "Current Value", "Days Held", "Underperforming FD"]
+                sold_df[
+                    [col("ticker"), col("buy_date"), col("sell_date"), col("buy_price"), col("buy_qty"), sell_price_col, "Investment", "FD Return", "RealizedValue", "Days Held", "Underperforming FD"]
                 ]
                 .style
                 .format({
                     col("buy_price"): "₹{:.2f}",
-                    col("current_price"): "₹{:.2f}",
+                    sell_price_col: "₹{:.2f}",
                     "Investment": "₹{:.2f}",
                     "FD Return": "₹{:.2f}",
-                    "Current Value": "₹{:.2f}",
+                    "RealizedValue": "₹{:.2f}",
                     "Days Held": "{:.0f}"
                 }),
                 use_container_width=True
