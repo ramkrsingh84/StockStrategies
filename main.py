@@ -243,6 +243,20 @@ elif authentication_status:
         show_outperformers_only = st.checkbox("✅ Show only outperformers (Strategy > FD)")
         
         #delete after debugging
+        
+        st.subheader("🧾 Ticker + Buy Date Audit")
+
+        # Show all tickers with their buy dates and raw types
+        audit_df = portfolio_df[[col("ticker"), col("buy_date")]].copy()
+        audit_df["Buy Date Raw"] = portfolio_df[col("buy_date")]
+        audit_df["Buy Date Type"] = audit_df["Buy Date Raw"].apply(lambda x: type(x).__name__)
+
+        # Optional: sort for clarity
+        audit_df = audit_df.sort_values(by=[col("ticker"), col("buy_date")], ascending=True)
+
+        st.dataframe(audit_df, use_container_width=True)
+
+        
         st.write("🔍 Raw portfolio entry:", portfolio_df[
             (portfolio_df[col("ticker")] == "NSE:IDFCFIRSTB") &
             (portfolio_df[col("buy_date")] == pd.to_datetime("20-08-2024"))
