@@ -70,7 +70,7 @@ elif authentication_status:
                 st.dataframe(buy_df, width="stretch")
 
     # ✅ Portfolio tab with SELL triggers
-    with tabs[-1]:
+    with tabs[-2]:
         st.subheader("📊 Unified Portfolio Overview")
 
         # 🔄 Refresh button
@@ -309,7 +309,6 @@ elif authentication_status:
             )
 
             # 📊 Bar chart: Strategy vs FD Profit
-            import matplotlib.pyplot as plt
 
             fig, ax = plt.subplots(figsize=(8, 6))
             bars = ax.barh(
