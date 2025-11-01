@@ -270,7 +270,7 @@ elif authentication_status:
                     "RealizedValue": "₹{:.2f}",
                     "Days Held": "{:.0f}"
                 }),
-                use_container_width=True
+                width="stretch"
             )
  
     # ✅ FD Benchmark Comparison tab
