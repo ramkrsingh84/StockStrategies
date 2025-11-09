@@ -5,15 +5,13 @@ from core.runner import StrategyRunner
 from core.columns import col
 from core.utils import refresh_all_sheets
 
-st.set_page_config(page_title="Portfolio with SELL Triggers", layout="wide")
-st.title("📊 Portfolio with SELL Triggers")
-
-
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
     st.warning("🔒 Please login from the Home page to access this section.")
     st.stop()
 
 
+st.set_page_config(page_title="Portfolio with SELL Triggers", layout="wide")
+st.title("📊 Portfolio with SELL Triggers")
 
 if st.button("🔄 Refresh Portfolio Data"):
     refresh_all_sheets(STRATEGY_CONFIG)

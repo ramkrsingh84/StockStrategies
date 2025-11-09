@@ -3,13 +3,12 @@ import pandas as pd
 from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 
-st.set_page_config(page_title="BUY Signals", layout="wide")
-st.title("🟢 BUY Signals")
-
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
     st.warning("🔒 Please login from the Home page to access this section.")
     st.stop()
 
+st.set_page_config(page_title="BUY Signals", layout="wide")
+st.title("🟢 BUY Signals")
 
 
 for strategy in STRATEGY_CONFIG:
@@ -22,3 +21,4 @@ for strategy in STRATEGY_CONFIG:
         st.success("✅ No BUY signals")
     else:
         st.dataframe(buy_df, use_container_width=True)
+        
