@@ -42,8 +42,8 @@ elif authentication_status:
     st.title("📊 DMA Signal Dashboard")
     st.markdown("Choose a section to explore:")
 
-    st.page_link("pages/1_BUY_Signals.py", label="🟢 View BUY Signals", icon="📈")
-    st.page_link("pages/2_Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
-    st.page_link("pages/3_FD_Benchmark.py", label="📈 FD Benchmark Comparison", icon="💰")
+    st.page_link("pages/BUY_Signals.py", label="🟢 View BUY Signals", icon="📈")
+    st.page_link("pages/Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
+    st.page_link("pages/FD_Benchmark.py", label="📈 FD Benchmark Comparison", icon="💰")
 
 
