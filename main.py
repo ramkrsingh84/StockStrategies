@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import streamlit_authenticator as stauth
 
 # ✅ Page setup
@@ -41,6 +42,8 @@ elif authentication_status:
     # ✅ Homepage content
     st.title("📊 DMA Signal Dashboard")
     st.markdown("Choose a section to explore:")
+    
+    st.write("Current working directory:", os.getcwd())
 
     st.page_link("pages/BUY_Signals.py", label="🟢 View BUY Signals", icon="📈")
     st.page_link("pages/Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
