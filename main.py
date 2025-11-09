@@ -47,7 +47,7 @@ elif authentication_status:
 
     #st.page_link("pages/test.py", label="Go to test")
     #st.page_link("pages/test.py", label="🟢 View BUY Signals", icon="📈")
-    st.page_link("pages/BUYSignals.py", label="🟢 View BUY Signals", icon="📈")
+    st.page_link("pages/1_BUY_Signals.py", label="🟢 View BUY Signals", icon="📈")
     #st.page_link("pages/Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
     #st.page_link("pages/FD_Benchmark.py", label="📈 FD Benchmark Comparison", icon="💰")
 
