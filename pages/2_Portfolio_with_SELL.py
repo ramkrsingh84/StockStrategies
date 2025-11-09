@@ -9,6 +9,7 @@ if "authentication_status" not in st.session_state or not st.session_state["auth
     st.warning("🔒 Please login from the Home page to access this section.")
     st.stop()
 
+st.page_link("main.py", label="⬅️ Back to Home", icon="🏠")
 
 st.set_page_config(page_title="Portfolio with SELL Triggers", layout="wide")
 st.title("📊 Portfolio with SELL Triggers")
