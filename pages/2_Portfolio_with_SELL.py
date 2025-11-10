@@ -23,14 +23,15 @@ last_refresh = st.session_state.get("last_refresh", pd.Timestamp.now())
 st.caption(f"Last refreshed: {last_refresh.strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 🌀 Load and merge all portfolios
-all_portfolios = []
-for strategy, config in STRATEGY_CONFIG.items():
-    runner = StrategyRunner(strategy, config)
-    df = runner.portfolio_mgr.load(config["portfolio_tab"])
-    df["Strategy"] = strategy
-    all_portfolios.append(df)
+with st.spinner("Loading portfolio data..."):
+    all_portfolios = []
+    for strategy, config in STRATEGY_CONFIG.items():
+        runner = StrategyRunner(strategy, config)
+        df = runner.portfolio_mgr.load(config["portfolio_tab"])
+        df["Strategy"] = strategy
+        all_portfolios.append(df)
 
-portfolio_df = pd.concat(all_portfolios, ignore_index=True)
+    portfolio_df = pd.concat(all_portfolios, ignore_index=True)
 active_df = portfolio_df[portfolio_df[col("sell_date")].isna()].copy()
 
 # ✅ Run SELL analysis
@@ -94,5 +95,5 @@ st.dataframe(
         "Profit": "₹{:.2f}",
         "Profit %": "{:.2f}%"
     }),
-    use_container_width=True
+    width="stretch"
 )
