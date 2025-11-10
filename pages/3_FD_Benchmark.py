@@ -86,7 +86,7 @@ else:
             "FD %": "{:.2f}%",
             "Excess %": "{:.2f}%"
         }),
-        use_container_width=True
+        width="stretch"
     )
 
     # 📊 Grouped Bar Chart: Strategy vs FD Profit
