@@ -16,6 +16,16 @@ st.page_link("main.py", label="⬅️ Back to Home", icon="🏠")
 st.set_page_config(page_title="Profit Realizarion", layout="wide")
 st.title("📈 Profit Realization")
 
+# 🌀 Load all portfolios
+all_portfolios = []
+for strategy, config in STRATEGY_CONFIG.items():
+    runner = StrategyRunner(strategy, config)
+    df = runner.portfolio_mgr.load(config["portfolio_tab"])
+    df["Strategy"] = strategy
+    all_portfolios.append(df)
+
+portfolio_df = pd.concat(all_portfolios, ignore_index=True)
+
 # 💰 Realized profit summary from sold holdings
 sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
 sell_price_col = "Sell Price"
