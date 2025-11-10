@@ -14,7 +14,7 @@ if "authentication_status" not in st.session_state or not st.session_state["auth
 st.page_link("main.py", label="⬅️ Back to Home", icon="🏠")
 
 st.set_page_config(page_title="FD Benchmark Comparison", layout="wide")
-st.title("📈 Strategy vs FD Benchmark")
+st.title("🏦 Strategy vs FD Benchmark")
 
 # 🌀 Load all portfolios
 all_portfolios = []
