@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 #import matplotlib.pyplot as plt
 #import numpy as np
-#from config import STRATEGY_CONFIG
+from config import STRATEGY_CONFIG
 from core.runner import StrategyRunner
 from core.columns import col
 
