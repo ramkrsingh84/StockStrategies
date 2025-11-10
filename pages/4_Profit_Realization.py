@@ -25,6 +25,7 @@ for strategy, config in STRATEGY_CONFIG.items():
     all_portfolios.append(df)
 
 portfolio_df = pd.concat(all_portfolios, ignore_index=True)
+active_df = portfolio_df[portfolio_df[col("sell_date")].isna()].copy()
 
 # 💰 Realized profit summary from sold holdings
 sold_df = portfolio_df[portfolio_df[col("sell_date")].notna()].copy()
