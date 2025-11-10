@@ -13,14 +13,34 @@ st.set_page_config(page_title="BUY Signals", layout="wide")
 st.title("🟢 BUY Signals")
 
 
-for strategy in STRATEGY_CONFIG:
-    st.subheader(f"📈 {strategy}")
-    runner = StrategyRunner(strategy, STRATEGY_CONFIG[strategy])
-    result_df = runner.run()
-    buy_df = result_df[result_df["Signal"] == "BUY"] if "Signal" in result_df.columns else pd.DataFrame()
+# ✅ Tabs setup (only visible after login)
+tabs = st.tabs([f"🟢 {strategy} BUY Signals" for strategy in STRATEGY_CONFIG.keys()] )
 
-    if buy_df.empty:
-        st.success("✅ No BUY signals")
-    else:
-        st.dataframe(buy_df, use_container_width=True)
+
+#for strategy in STRATEGY_CONFIG:
+#    st.subheader(f"📈 {strategy}")
+#    runner = StrategyRunner(strategy, STRATEGY_CONFIG[strategy])
+#    result_df = runner.run()
+#    buy_df = result_df[result_df["Signal"] == "BUY"] if "Signal" in result_df.columns else pd.DataFrame()
+#
+#    if buy_df.empty:
+#        st.success("✅ No BUY signals")
+#    else:
+#        st.dataframe(buy_df, use_container_width=True)
+        
+# ✅ BUY signal tabs
+for i, strategy in enumerate(STRATEGY_CONFIG.keys()):
+    with tabs[i]:
+        runner = StrategyRunner(strategy, STRATEGY_CONFIG[strategy])
+        result_df = runner.run()
+        if "Signal" in result_df.columns:
+            buy_df = result_df[result_df["Signal"] == "BUY"]
+        else:
+            buy_df = pd.DataFrame()
+
+        if buy_df.empty:
+            st.success(f"✅ No BUY signals for {strategy}")
+        else:
+            st.subheader(f"🟢 BUY Signals for {strategy}")
+            st.dataframe(buy_df, width="stretch")
         
