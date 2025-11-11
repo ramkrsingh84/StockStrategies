@@ -78,9 +78,22 @@ class MomentumValueAnalyzer:
     def analyze_buy(self, df):
         tickers = df["Ticker"].dropna().unique().tolist()
         tickers = [self._normalize_ticker(t) for t in tickers]
+        tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
+
 
         # 📈 Momentum: 6-month return
-        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False)["Adj Close"]
+        raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False)
+        
+        if price_data.empty:
+            st.warning("⚠️ Price data download failed. Check ticker formatting or market availability.")
+            st.stop()
+
+        if isinstance(raw_data.columns, pd.MultiIndex):
+            price_data = raw_data["Adj Close"]
+        else:
+            st.warning("⚠️ Unexpected data format from yfinance. No 'Adj Close' found.")
+            st.stop()
+            
         returns = price_data.pct_change().dropna()
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
