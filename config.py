@@ -14,5 +14,12 @@ STRATEGY_CONFIG = {
         "buy_tabs": ["Top_500_Stocks"],
         "analyzer_class": ConsolidateAnalyzer,
         "sell_threshold_pct": 12
+    },
+    "MomentumValue": {
+        "sheet_name": "DMA_Data",
+        "portfolio_tab": "Portfolio_MomentumValue",
+        "buy_tabs": ["Nifty_200"],
+        "analyzer_class": MomentumValueAnalyzer,
+        "sell_threshold_pct": 12
     }
 }

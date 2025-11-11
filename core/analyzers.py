@@ -1,6 +1,8 @@
 import pandas as pd
 from datetime import datetime
 from core.columns import col
+import yfinance as yf
+
 
 class SignalAnalyzer:
     def __init__(self, sell_threshold_pct=12):
@@ -65,3 +67,38 @@ class ConsolidateAnalyzer(SignalAnalyzer):
                         "Signal": "BUY",
                         "Price": round(float(price), 2)
                     })
+
+class MomentumValueAnalyzer:
+    def __init__(self, **kwargs):
+        self.signal_log = []
+
+    def analyze_buy(self, df):
+        tickers = df["Ticker"].dropna().unique().tolist()
+
+        # 📈 Momentum: 6-month return
+        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False)["Adj Close"]
+        returns = price_data.pct_change().dropna()
+        cumulative_returns = (1 + returns).prod() - 1
+        momentum_rank = cumulative_returns.rank(ascending=False)
+
+        # 📊 Value: PE and ROE
+        fundamentals = {}
+        for ticker in tickers:
+            try:
+                info = yf.Ticker(ticker).info
+                pe = info.get("trailingPE", None)
+                roe = info.get("returnOnEquity", None)
+                fundamentals[ticker] = {"PE": pe, "ROE": roe}
+            except Exception:
+                fundamentals[ticker] = {"PE": None, "ROE": None}
+
+        fundamentals_df = pd.DataFrame(fundamentals).T
+        fundamentals_df["Momentum Rank"] = momentum_rank
+        fundamentals_df["PE Rank"] = fundamentals_df["PE"].rank(ascending=True)
+        fundamentals_df["ROE Rank"] = fundamentals_df["ROE"].rank(ascending=False)
+        fundamentals_df["Combined Score"] = fundamentals_df[["Momentum Rank", "PE Rank", "ROE Rank"]].mean(axis=1)
+
+        # ✅ Select top picks
+        top_df = fundamentals_df.sort_values("Combined Score").head(10).reset_index().rename(columns={"index": "Ticker"})
+        top_df["Signal"] = "BUY"
+        self.signal_log = top_df.to_dict("records")
