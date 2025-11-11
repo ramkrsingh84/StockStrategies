@@ -83,16 +83,25 @@ class MomentumValueAnalyzer:
 
         # 📈 Momentum: 6-month return
         raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False)
-        
-        if price_data.empty:
-            st.warning("⚠️ Price data download failed. Check ticker formatting or market availability.")
-            st.stop()
 
+        # Defensive fallback
+        if raw_data.empty:
+            self.signal_log = []
+            return
+
+        # Handle MultiIndex vs flat columns
         if isinstance(raw_data.columns, pd.MultiIndex):
-            price_data = raw_data["Adj Close"]
+            if "Adj Close" in raw_data.columns.levels[0]:
+                price_data = raw_data["Adj Close"]
+            else:
+                self.signal_log = []
+                return
         else:
-            st.warning("⚠️ Unexpected data format from yfinance. No 'Adj Close' found.")
-            st.stop()
+            if "Adj Close" in raw_data.columns:
+                price_data = raw_data["Adj Close"]
+            else:
+                self.signal_log = []
+                return
             
         returns = price_data.pct_change().dropna()
         cumulative_returns = (1 + returns).prod() - 1
