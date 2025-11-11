@@ -72,7 +72,7 @@ class MomentumValueAnalyzer:
     def __init__(self, **kwargs):
         self.signal_log = []
     
-    def _normalize_ticker(ticker):
+    def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
     def analyze_buy(self, df):
