@@ -71,68 +71,58 @@ class ConsolidateAnalyzer(SignalAnalyzer):
 class MomentumValueAnalyzer:
     def __init__(self, **kwargs):
         self.signal_log = []
-    
+        self.analysis_df = pd.DataFrame()
+
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
     def analyze_buy(self, df):
         if "Ticker" not in df.columns:
-            print("⚠️ 'Ticker' column missing in buy_df. Available columns:", df.columns.tolist())
             self.signal_log = []
             return
-            
-        tickers = df["Ticker"].dropna().unique().tolist()
-        tickers = [self._normalize_ticker(t) for t in tickers]
+
+        tickers = [self._normalize_ticker(t) for t in df["Ticker"].dropna().unique()]
         tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
 
-
-        # 📈 Momentum: 6-month return
         raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False)
-
-        # Defensive fallback
         if raw_data.empty:
             self.signal_log = []
             return
 
-        # Handle MultiIndex vs flat columns
-        if isinstance(raw_data.columns, pd.MultiIndex):
-            if "Adj Close" in raw_data.columns.levels[0]:
-                price_data = raw_data["Adj Close"]
-            else:
-                self.signal_log = []
-                return
+        if isinstance(raw_data.columns, pd.MultiIndex) and "Adj Close" in raw_data.columns.levels[0]:
+            price_data = raw_data["Adj Close"]
+        elif "Adj Close" in raw_data.columns:
+            price_data = raw_data["Adj Close"]
         else:
-            if "Adj Close" in raw_data.columns:
-                price_data = raw_data["Adj Close"]
-            else:
-                self.signal_log = []
-                return
-            
+            self.signal_log = []
+            return
+
         returns = price_data.pct_change().dropna()
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Value: PE and ROE
         fundamentals = {}
         for ticker in tickers:
             try:
                 info = yf.Ticker(ticker).info
-                pe = info.get("trailingPE", None)
-                roe = info.get("returnOnEquity", None)
+                pe = info.get("trailingPE")
+                roe = info.get("returnOnEquity")
                 fundamentals[ticker] = {"PE": pe, "ROE": roe}
             except Exception:
                 fundamentals[ticker] = {"PE": None, "ROE": None}
 
-        fundamentals_df = pd.DataFrame(fundamentals).T
-        fundamentals_df["Momentum Rank"] = momentum_rank
-        fundamentals_df["PE Rank"] = fundamentals_df["PE"].rank(ascending=True)
-        fundamentals_df["ROE Rank"] = fundamentals_df["ROE"].rank(ascending=False)
-        fundamentals_df["Combined Score"] = fundamentals_df[["Momentum Rank", "PE Rank", "ROE Rank"]].mean(axis=1)
+        df_fund = pd.DataFrame(fundamentals).T
+        df_fund["Momentum Rank"] = momentum_rank
+        df_fund["PE Rank"] = df_fund["PE"].rank(ascending=True)
+        df_fund["ROE Rank"] = df_fund["ROE"].rank(ascending=False)
+        df_fund["Combined Score"] = df_fund[["Momentum Rank", "PE Rank", "ROE Rank"]].mean(axis=1)
 
-        # ✅ Select top picks
-        top_df = fundamentals_df.sort_values("Combined Score").head(10).reset_index().rename(columns={"index": "Ticker"})
-        top_df["Signal"] = "BUY"
-        self.signal_log = top_df.to_dict("records")
+        df_fund = df_fund.sort_values("Combined Score").reset_index().rename(columns={"index": "Ticker"})
+        df_fund["Signal"] = ""
+        df_fund.loc[:9, "Signal"] = "BUY"  # Top 10 picks
+
+        self.analysis_df = df_fund.copy()
+        self.signal_log = df_fund[df_fund["Signal"] == "BUY"].to_dict("records")
     
     def analyze_sell(self, df):
         # No sell logic for this strategy
