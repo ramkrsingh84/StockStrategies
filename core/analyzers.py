@@ -88,47 +88,51 @@ class MomentumValueAnalyzer:
         return pd.concat(all_data, axis=1) if all_data else pd.DataFrame()
 
     def analyze_buy(self, df):
-        if "Ticker" not in df.columns or "PE" not in df.columns:
-            print("⚠️ Required columns missing in buy_df:", df.columns.tolist())
-            self.signal_log = []
-            self.analysis_df = pd.DataFrame()
+        self.signal_log = []
+        self.analysis_df = pd.DataFrame()
+
+        # ✅ Check required columns
+        required_cols = {"Ticker", "PE"}
+        if not required_cols.issubset(df.columns):
+            print("⚠️ Missing columns in buy_df:", df.columns.tolist())
             return
 
         # 🧼 Clean PE column
-        df["PE"] = pd.to_numeric(df["PE"], errors="coerce")  # converts #NA or text to NaN
+        df["PE"] = pd.to_numeric(df["PE"], errors="coerce")  # converts '#N/A', 'N/A', text to NaN
 
-        # ✅ Normalize tickers for yFinance
-        tickers = [self._normalize_ticker(t) for t in df["Ticker"].dropna().unique()]
-        tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
+        # ✅ Normalize tickers
+        df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
+        tickers = df["Normalized Ticker"].dropna().unique().tolist()
 
-        # 📈 Momentum: 6-month return
+        # 📈 Download price data
         raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
         if raw_data.empty:
-            self.signal_log = []
-            self.analysis_df = pd.DataFrame()
+            print("⚠️ Price data download failed.")
             return
 
+        # 🧠 Extract adjusted close
         if isinstance(raw_data.columns, pd.MultiIndex) and "Adj Close" in raw_data.columns.levels[0]:
             price_data = raw_data["Adj Close"]
         elif "Adj Close" in raw_data.columns:
             price_data = raw_data["Adj Close"]
         else:
-            self.signal_log = []
-            self.analysis_df = pd.DataFrame()
+            print("⚠️ 'Adj Close' not found in price data.")
             return
 
+        # 📊 Momentum calculation
         returns = price_data.pct_change(fill_method=None).dropna()
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Use PE from sheet, skip ROE
-        pe_map = df.set_index("Ticker")["PE"].to_dict()
-        fundamentals = {}
-        for ticker in tickers:
-            fundamentals[ticker] = {
+        # 🧠 Build fundamentals table
+        pe_map = df.set_index("Normalized Ticker")["PE"].to_dict()
+        fundamentals = {
+            ticker: {
                 "PE": pe_map.get(ticker, pd.NA),
-                "ROE": pd.NA  # optional: skip or add from sheet later
+                "ROE": pd.NA  # placeholder
             }
+            for ticker in tickers
+        }
 
         df_fund = pd.DataFrame(fundamentals).T
         df_fund["Momentum Rank"] = momentum_rank
@@ -136,6 +140,7 @@ class MomentumValueAnalyzer:
         df_fund["ROE Rank"] = pd.NA
         df_fund["Combined Score"] = df_fund[["Momentum Rank", "PE Rank"]].mean(axis=1)
 
+        # 🏁 Final output
         df_fund = df_fund.sort_values("Combined Score").reset_index().rename(columns={"index": "Ticker"})
         df_fund["Signal"] = ""
         df_fund.loc[:9, "Signal"] = "BUY"
