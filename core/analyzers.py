@@ -72,12 +72,12 @@ class MomentumValueAnalyzer:
     def __init__(self, **kwargs):
         self.signal_log = []
     
-    def normalize_ticker(ticker):
+    def _normalize_ticker(ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
     def analyze_buy(self, df):
         tickers = df["Ticker"].dropna().unique().tolist()
-        tickers = [normalize_ticker(t) for t in tickers]
+        tickers = [self._normalize_ticker(t) for t in tickers]
 
         # 📈 Momentum: 6-month return
         price_data = yf.download(tickers, period="6mo", interval="1d", progress=False)["Adj Close"]
