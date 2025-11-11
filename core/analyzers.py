@@ -106,3 +106,7 @@ class MomentumValueAnalyzer:
         top_df = fundamentals_df.sort_values("Combined Score").head(10).reset_index().rename(columns={"index": "Ticker"})
         top_df["Signal"] = "BUY"
         self.signal_log = top_df.to_dict("records")
+    
+    def analyze_sell(self, df):
+        # No sell logic for this strategy
+        self.signal_log += []  # or just pass
