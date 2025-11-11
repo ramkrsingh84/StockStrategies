@@ -5,3 +5,4 @@ oauth2client
 streamlit
 streamlit-authenticator==0.2.2
 matplotlib
+yfinance
