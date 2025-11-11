@@ -75,6 +75,17 @@ class MomentumValueAnalyzer:
 
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
+        
+    def download_in_batches(self, tickers, **kwargs):
+        all_data = []
+        for i in range(0, len(tickers), 25):
+            batch = tickers[i:i+25]
+            try:
+                data = yf.download(batch, **kwargs)
+                all_data.append(data)
+            except Exception as e:
+                print(f"Batch failed: {batch} → {e}")
+        return pd.concat(all_data, axis=1) if all_data else pd.DataFrame()
 
     def analyze_buy(self, df):
         if "Ticker" not in df.columns:
@@ -84,7 +95,7 @@ class MomentumValueAnalyzer:
         tickers = [self._normalize_ticker(t) for t in df["Ticker"].dropna().unique()]
         tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
 
-        raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False)
+        raw_data = self.download_in_batches(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
         if raw_data.empty:
             self.signal_log = []
             return
@@ -97,7 +108,7 @@ class MomentumValueAnalyzer:
             self.signal_log = []
             return
 
-        returns = price_data.pct_change().dropna()
+        returns = price_data.pct_change(fill_method=None).dropna()
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 

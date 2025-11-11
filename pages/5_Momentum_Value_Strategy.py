@@ -28,7 +28,7 @@ else:
             "ROE Rank": "{:.0f}",
             "Combined Score": "{:.2f}"
         }),
-        use_container_width=True
+        width="stretch"
     )
 
 with st.container():
