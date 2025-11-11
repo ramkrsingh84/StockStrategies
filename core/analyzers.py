@@ -76,6 +76,11 @@ class MomentumValueAnalyzer:
         return ticker.replace("NSE:", "").strip() + ".NS"
 
     def analyze_buy(self, df):
+        if "Ticker" not in df.columns:
+            print("⚠️ 'Ticker' column missing in buy_df. Available columns:", df.columns.tolist())
+            self.signal_log = []
+            return
+            
         tickers = df["Ticker"].dropna().unique().tolist()
         tickers = [self._normalize_ticker(t) for t in tickers]
         tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
