@@ -88,60 +88,60 @@ class MomentumValueAnalyzer:
         return pd.concat(all_data, axis=1) if all_data else pd.DataFrame()
 
     def analyze_buy(self, df):
-    if "Ticker" not in df.columns or "PE" not in df.columns:
-        print("⚠️ Required columns missing in buy_df:", df.columns.tolist())
-        self.signal_log = []
-        self.analysis_df = pd.DataFrame()
-        return
+        if "Ticker" not in df.columns or "PE" not in df.columns:
+            print("⚠️ Required columns missing in buy_df:", df.columns.tolist())
+            self.signal_log = []
+            self.analysis_df = pd.DataFrame()
+            return
 
-    # 🧼 Clean PE column
-    df["PE"] = pd.to_numeric(df["PE"], errors="coerce")  # converts #NA or text to NaN
+        # 🧼 Clean PE column
+        df["PE"] = pd.to_numeric(df["PE"], errors="coerce")  # converts #NA or text to NaN
 
-    # ✅ Normalize tickers for yFinance
-    tickers = [self._normalize_ticker(t) for t in df["Ticker"].dropna().unique()]
-    tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
+        # ✅ Normalize tickers for yFinance
+        tickers = [self._normalize_ticker(t) for t in df["Ticker"].dropna().unique()]
+        tickers = [t for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
 
-    # 📈 Momentum: 6-month return
-    raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
-    if raw_data.empty:
-        self.signal_log = []
-        self.analysis_df = pd.DataFrame()
-        return
+        # 📈 Momentum: 6-month return
+        raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
+        if raw_data.empty:
+            self.signal_log = []
+            self.analysis_df = pd.DataFrame()
+            return
 
-    if isinstance(raw_data.columns, pd.MultiIndex) and "Adj Close" in raw_data.columns.levels[0]:
-        price_data = raw_data["Adj Close"]
-    elif "Adj Close" in raw_data.columns:
-        price_data = raw_data["Adj Close"]
-    else:
-        self.signal_log = []
-        self.analysis_df = pd.DataFrame()
-        return
+        if isinstance(raw_data.columns, pd.MultiIndex) and "Adj Close" in raw_data.columns.levels[0]:
+            price_data = raw_data["Adj Close"]
+        elif "Adj Close" in raw_data.columns:
+            price_data = raw_data["Adj Close"]
+        else:
+            self.signal_log = []
+            self.analysis_df = pd.DataFrame()
+            return
 
-    returns = price_data.pct_change(fill_method=None).dropna()
-    cumulative_returns = (1 + returns).prod() - 1
-    momentum_rank = cumulative_returns.rank(ascending=False)
+        returns = price_data.pct_change(fill_method=None).dropna()
+        cumulative_returns = (1 + returns).prod() - 1
+        momentum_rank = cumulative_returns.rank(ascending=False)
 
-    # 📊 Use PE from sheet, skip ROE
-    pe_map = df.set_index("Ticker")["PE"].to_dict()
-    fundamentals = {}
-    for ticker in tickers:
-        fundamentals[ticker] = {
-            "PE": pe_map.get(ticker, pd.NA),
-            "ROE": pd.NA  # optional: skip or add from sheet later
-        }
+        # 📊 Use PE from sheet, skip ROE
+        pe_map = df.set_index("Ticker")["PE"].to_dict()
+        fundamentals = {}
+        for ticker in tickers:
+            fundamentals[ticker] = {
+                "PE": pe_map.get(ticker, pd.NA),
+                "ROE": pd.NA  # optional: skip or add from sheet later
+            }
 
-    df_fund = pd.DataFrame(fundamentals).T
-    df_fund["Momentum Rank"] = momentum_rank
-    df_fund["PE Rank"] = df_fund["PE"].rank(ascending=True)
-    df_fund["ROE Rank"] = pd.NA
-    df_fund["Combined Score"] = df_fund[["Momentum Rank", "PE Rank"]].mean(axis=1)
+        df_fund = pd.DataFrame(fundamentals).T
+        df_fund["Momentum Rank"] = momentum_rank
+        df_fund["PE Rank"] = df_fund["PE"].rank(ascending=True)
+        df_fund["ROE Rank"] = pd.NA
+        df_fund["Combined Score"] = df_fund[["Momentum Rank", "PE Rank"]].mean(axis=1)
 
-    df_fund = df_fund.sort_values("Combined Score").reset_index().rename(columns={"index": "Ticker"})
-    df_fund["Signal"] = ""
-    df_fund.loc[:9, "Signal"] = "BUY"
+        df_fund = df_fund.sort_values("Combined Score").reset_index().rename(columns={"index": "Ticker"})
+        df_fund["Signal"] = ""
+        df_fund.loc[:9, "Signal"] = "BUY"
 
-    self.analysis_df = df_fund.copy()
-    self.signal_log = df_fund[df_fund["Signal"] == "BUY"].to_dict("records")
+        self.analysis_df = df_fund.copy()
+        self.signal_log = df_fund[df_fund["Signal"] == "BUY"].to_dict("records")
     
     def analyze_sell(self, df):
         # No sell logic for this strategy
