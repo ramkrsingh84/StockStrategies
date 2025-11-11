@@ -17,6 +17,7 @@ analysis_df = runner.analyzer.analysis_df
 if analysis_df.empty:
     st.info("No analysis data available.")
 else:
+    analysis_df = analysis_df.fillna(pd.NA)
     st.dataframe(
         analysis_df[
             ["Ticker", "PE", "ROE", "Momentum Rank", "PE Rank", "ROE Rank", "Combined Score", "Signal"]
