@@ -1,4 +1,4 @@
-from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer
+from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, MomentumValueAnalyzer
 
 STRATEGY_CONFIG = {
     "DMA": {
