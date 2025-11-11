@@ -3,7 +3,7 @@ import os
 import streamlit_authenticator as stauth
 
 # ✅ Page setup
-st.set_page_config(page_title="DMA Dashboard", layout="centered")
+st.set_page_config(page_title="Home Page", layout="centered")
 
 # ✅ Load credentials from secrets
 credentials = {
@@ -40,10 +40,9 @@ elif authentication_status:
     st.session_state["name"] = name
 
     # ✅ Homepage content
-    st.title("📊 DMA Signal Dashboard")
+    st.title("📊 Home Page")
     st.markdown("Choose a section to explore:")
     
-    st.write("Current working directory:", os.getcwd())
 
     st.page_link("pages/1_BUY_Signals.py", label="🟢 View BUY Signals", icon="📈")
     st.page_link("pages/2_Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
