@@ -48,6 +48,6 @@ elif authentication_status:
     st.page_link("pages/2_Portfolio_with_SELL.py", label="📊 Portfolio with SELL Triggers", icon="📦")
     st.page_link("pages/3_FD_Benchmark.py", label="🏦 FD Benchmark Comparison", icon="💰")
     st.page_link("pages/4_Profit_Realization.py", label="📈 Profit Realization", icon="💰")
-    st.page_link("pages/5_Momentum_Value_Strategy.py", label="📊 Momentum Value Strategy", icon="📈")
+    st.page_link("pages/5_Trending_Value_Strategy.py", label="📊 Trending Value Strategy", icon="📈")
 
 
