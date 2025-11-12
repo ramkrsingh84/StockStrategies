@@ -6,7 +6,7 @@ import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
-
+from bharat_sm_data.Fundamentals.NSE import get_ratios
 
 
 
@@ -82,36 +82,24 @@ class TrendingValueAnalyzer:
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
-    def _scrape_screener_ratios(self, ticker):
+    def _fetch_ratios_bharat(self, ticker):
         try:
-            url = f"https://www.screener.in/company/{ticker}/consolidated/"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=5)
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            def extract(label):
-                try:
-                    cell = soup.find("td", string=label)
-                    if cell:
-                        return pd.to_numeric(cell.find_next("td").text.strip().replace(",", ""), errors="coerce")
-                except:
-                    return pd.NA
-
+            ratios = get_ratios(ticker)
             return {
-                "PE": extract("P/E"),
-                "PB": extract("P/BV"),
-                "EV_EBITDA": extract("EV / EBITDA"),
-                "P_Sales": extract("Price to Sales"),
-                "P_CashFlow": extract("Price to Cash Flow")
+                "PE": ratios.get("pe_ratio"),
+                "PB": ratios.get("pb_ratio"),
+                "EV_EBITDA": ratios.get("ev_to_ebitda"),
+                "P_Sales": ratios.get("price_to_sales"),
+                "P_CashFlow": ratios.get("price_to_cash_flow")
             }
         except Exception as e:
-            print(f"⚠️ Screener fetch failed for {ticker}: {e}")
+            print(f"⚠️ Bharat-SM fetch failed for {ticker}: {e}")
             return {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
 
     def _fetch_all_ratios(self, tickers):
         def fetch(ticker):
-            screener_ticker = ticker.replace(".NS", "")
-            return ticker, self._scrape_screener_ratios(screener_ticker)
+            nse_ticker = ticker.replace(".NS", "")
+            return ticker, self._fetch_ratios_bharat(nse_ticker)
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             results = executor.map(fetch, tickers)
@@ -146,7 +134,7 @@ class TrendingValueAnalyzer:
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Valuation ratios from Screener.in
+        # 📊 Valuation ratios from Bharat-SM-Data
         ratios = self._fetch_all_ratios(tickers)
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
@@ -169,3 +157,4 @@ class TrendingValueAnalyzer:
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet
+
