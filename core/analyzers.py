@@ -75,6 +75,26 @@ class TrendingValueAnalyzer:
 
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
+    
+    def _fetch_ratios_batch(self, tickers, batch_size=10, delay=2):
+        ratios = {}
+        for i in range(0, len(tickers), batch_size):
+            batch = tickers[i:i+batch_size]
+            for ticker in batch:
+                try:
+                    info = yf.Ticker(ticker).info
+                    ratios[ticker] = {
+                        "PE": info.get("trailingPE"),
+                        "PB": info.get("priceToBook"),
+                        "EV_EBITDA": info.get("enterpriseToEbitda"),
+                        "P_Sales": info.get("priceToSalesTrailing12Months"),
+                        "P_CashFlow": info.get("operatingCashflow") and info.get("marketCap") / info.get("operatingCashflow")
+                    }
+                except Exception as e:
+                    print(f"⚠️ Failed for {ticker}: {e}")
+                    ratios[ticker] = {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
+            time.sleep(delay)
+        return ratios
 
     def analyze_buy(self, df):
         self.signal_log = []
@@ -107,22 +127,7 @@ class TrendingValueAnalyzer:
         momentum_rank = cumulative_returns.rank(ascending=False)
 
         # 📊 Fetch valuation ratios from yFinance
-        ratios = {}
-        for ticker in tickers:
-            try:
-                info = yf.Ticker(ticker).info
-                ratios[ticker] = {
-                    "PE": info.get("trailingPE"),
-                    "PB": info.get("priceToBook"),
-                    "EV_EBITDA": info.get("enterpriseToEbitda"),
-                    "P_Sales": info.get("priceToSalesTrailing12Months"),
-                    "P_CashFlow": info.get("operatingCashflow") and info.get("marketCap") / info.get("operatingCashflow")
-                }
-            except Exception as e:
-                print(f"⚠️ Failed to fetch ratios for {ticker}: {e}")
-                ratios[ticker] = {
-                    "PE": pd.NA, "PB": pd.NA, "EV_EBITDA": pd.NA, "P_Sales": pd.NA, "P_CashFlow": pd.NA
-                }
+        ratios = self._fetch_ratios_batch(tickers)
 
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
