@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime
+import time
 from core.columns import col
 import yfinance as yf
 
@@ -76,7 +77,7 @@ class TrendingValueAnalyzer:
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
     
-    def _fetch_ratios_batch(self, tickers, batch_size=10, delay=2):
+    def _fetch_ratios_batch(self, tickers, batch_size=10, delay=3):
         ratios = {}
         for i in range(0, len(tickers), batch_size):
             batch = tickers[i:i+batch_size]
