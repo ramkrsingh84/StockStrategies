@@ -3,6 +3,7 @@ from datetime import datetime
 import time
 from core.columns import col
 import yfinance as yf
+import requests
 
 
 class SignalAnalyzer:
@@ -76,26 +77,29 @@ class TrendingValueAnalyzer:
 
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
-    
-    def _fetch_ratios_batch(self, tickers, batch_size=10, delay=3):
-        ratios = {}
-        for i in range(0, len(tickers), batch_size):
-            batch = tickers[i:i+batch_size]
-            for ticker in batch:
-                try:
-                    info = yf.Ticker(ticker).info
-                    ratios[ticker] = {
-                        "PE": info.get("trailingPE"),
-                        "PB": info.get("priceToBook"),
-                        "EV_EBITDA": info.get("enterpriseToEbitda"),
-                        "P_Sales": info.get("priceToSalesTrailing12Months"),
-                        "P_CashFlow": info.get("operatingCashflow") and info.get("marketCap") / info.get("operatingCashflow")
-                    }
-                except Exception as e:
-                    print(f"⚠️ Failed for {ticker}: {e}")
-                    ratios[ticker] = {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
-            time.sleep(delay)
-        return ratios
+
+    def _fetch_nse_ratios(self, ticker):
+        try:
+            session = requests.Session()
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json"
+            }
+            session.get("https://www.nseindia.com", headers=headers)
+            url = f"https://www.nseindia.com/api/quote-equity?symbol={ticker}"
+            response = session.get(url, headers=headers, timeout=5)
+            data = response.json()
+            meta = data.get("metadata", {})
+            return {
+                "PE": meta.get("pE"),
+                "PB": meta.get("bookValue") and meta.get("lastPrice") / meta.get("bookValue"),
+                "EV_EBITDA": pd.NA,
+                "P_Sales": pd.NA,
+                "P_CashFlow": pd.NA
+            }
+        except Exception as e:
+            print(f"⚠️ NSE fetch failed for {ticker}: {e}")
+            return {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
 
     def analyze_buy(self, df):
         self.signal_log = []
@@ -105,11 +109,10 @@ class TrendingValueAnalyzer:
             print("⚠️ 'Ticker' column missing.")
             return
 
-        # ✅ Normalize tickers
         df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
         tickers = df["Normalized Ticker"].dropna().unique().tolist()
 
-        # 📈 Download price data for momentum
+        # 📈 Momentum from yFinance
         price_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
         if price_data.empty:
             print("⚠️ Price data download failed.")
@@ -127,8 +130,12 @@ class TrendingValueAnalyzer:
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Fetch valuation ratios from yFinance
-        ratios = self._fetch_ratios_batch(tickers)
+        # 📊 Valuation ratios from NSE
+        ratios = {}
+        for ticker in df["Normalized Ticker"]:
+            nse_ticker = ticker.replace(".NS", "")
+            ratios[ticker] = self._fetch_nse_ratios(nse_ticker)
+            time.sleep(1.5)  # avoid rate limit
 
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
@@ -142,7 +149,6 @@ class TrendingValueAnalyzer:
         df_ratios["VCS"] = df_ratios[[f"{col}_Rank" for col in value_cols]].mean(axis=1)
         df_ratios["Final Score"] = df_ratios[["VCS", "Momentum Rank"]].mean(axis=1)
 
-        # 🏁 Final output
         df_final = df_ratios.reset_index().rename(columns={"index": "Ticker"})
         df_final["Signal"] = ""
         df_final.loc[:24, "Signal"] = "BUY"
@@ -152,5 +158,3 @@ class TrendingValueAnalyzer:
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet
-
-
