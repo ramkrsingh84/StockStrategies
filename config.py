@@ -1,4 +1,4 @@
-from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, MomentumValueAnalyzer
+from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, TrendingValueAnalyzer
 
 STRATEGY_CONFIG = {
     "DMA": {
@@ -15,11 +15,11 @@ STRATEGY_CONFIG = {
         "analyzer_class": ConsolidateAnalyzer,
         "sell_threshold_pct": 12
     },
-    "MomentumValue": {
+    "TrendingValue": {
         "sheet_name": "DMA_Data",
-        "portfolio_tab": "Portfolio_MomentumValue",
+        "portfolio_tab": "Portfolio_TrendingValue",
         "buy_tabs": ["Nifty_200"],
-        "analyzer_class": MomentumValueAnalyzer,
+        "analyzer_class": TrendingValueAnalyzer,
         "sell_threshold_pct": 12
     }
 }
