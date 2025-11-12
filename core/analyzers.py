@@ -78,7 +78,7 @@ class TrendingValueAnalyzer:
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
-    def _fetch_nse_ratios(self, ticker):
+    def _fetch_nse_ratios(self, ticker, sheet_pe=None):
         try:
             session = requests.Session()
             headers = {
@@ -90,8 +90,12 @@ class TrendingValueAnalyzer:
             response = session.get(url, headers=headers, timeout=5)
             data = response.json()
             meta = data.get("metadata", {})
+
+            # 🧠 Use sheet PE if valid, else fallback to NSE
+            pe_value = sheet_pe if pd.notna(sheet_pe) else meta.get("pE")
+
             return {
-                "PE": meta.get("pE"),
+                "PE": pe_value,
                 "PB": meta.get("bookValue") and meta.get("lastPrice") / meta.get("bookValue"),
                 "EV_EBITDA": pd.NA,
                 "P_Sales": pd.NA,
@@ -105,8 +109,8 @@ class TrendingValueAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-        if "Ticker" not in df.columns:
-            print("⚠️ 'Ticker' column missing.")
+        if "Ticker" not in df.columns or "PE" not in df.columns:
+            print("⚠️ 'Ticker' or 'PE' column missing.")
             return
 
         df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
@@ -130,12 +134,14 @@ class TrendingValueAnalyzer:
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Valuation ratios from NSE
+        # 📊 Valuation ratios: PE from sheet, rest from NSE
+        sheet_pe_map = df.set_index("Normalized Ticker")["PE"].to_dict()
         ratios = {}
         for ticker in df["Normalized Ticker"]:
             nse_ticker = ticker.replace(".NS", "")
-            ratios[ticker] = self._fetch_nse_ratios(nse_ticker)
-            time.sleep(1.5)  # avoid rate limit
+            sheet_pe = sheet_pe_map.get(ticker, pd.NA)
+            ratios[ticker] = self._fetch_nse_ratios(nse_ticker, sheet_pe)
+            time.sleep(1.5)
 
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
