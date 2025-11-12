@@ -4,6 +4,8 @@ import time
 from core.columns import col
 import yfinance as yf
 import requests
+from concurrent.futures import ThreadPoolExecutor
+
 
 
 class SignalAnalyzer:
@@ -91,7 +93,6 @@ class TrendingValueAnalyzer:
             data = response.json()
             meta = data.get("metadata", {})
 
-            # 🧠 Use sheet PE if valid, else fallback to NSE
             pe_value = sheet_pe if pd.notna(sheet_pe) else meta.get("pE")
 
             return {
@@ -105,6 +106,16 @@ class TrendingValueAnalyzer:
             print(f"⚠️ NSE fetch failed for {ticker}: {e}")
             return {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
 
+    def _fetch_all_nse_ratios(self, tickers, sheet_pe_map):
+        def fetch(ticker):
+            nse_ticker = ticker.replace(".NS", "")
+            sheet_pe = sheet_pe_map.get(ticker, pd.NA)
+            return ticker, self._fetch_nse_ratios(nse_ticker, sheet_pe)
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(fetch, tickers)
+        return dict(results)
+
     def analyze_buy(self, df):
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
@@ -117,7 +128,7 @@ class TrendingValueAnalyzer:
         tickers = df["Normalized Ticker"].dropna().unique().tolist()
 
         # 📈 Momentum from yFinance
-        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
+        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False, threads=True)
         if price_data.empty:
             print("⚠️ Price data download failed.")
             return
@@ -134,14 +145,9 @@ class TrendingValueAnalyzer:
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 📊 Valuation ratios: PE from sheet, rest from NSE
+        # 🧠 PE from sheet, rest from NSE (parallel)
         sheet_pe_map = df.set_index("Normalized Ticker")["PE"].to_dict()
-        ratios = {}
-        for ticker in df["Normalized Ticker"]:
-            nse_ticker = ticker.replace(".NS", "")
-            sheet_pe = sheet_pe_map.get(ticker, pd.NA)
-            ratios[ticker] = self._fetch_nse_ratios(nse_ticker, sheet_pe)
-            time.sleep(1.5)
+        ratios = self._fetch_all_nse_ratios(tickers, sheet_pe_map)
 
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
@@ -164,3 +170,4 @@ class TrendingValueAnalyzer:
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet
+
