@@ -80,51 +80,64 @@ class TrendingValueAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-        # ✅ Required columns
-        value_cols = ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]
-        required_cols = {"Ticker"} | set(value_cols)
-        if not required_cols.issubset(df.columns):
-            print("⚠️ Missing columns:", df.columns.tolist())
+        if "Ticker" not in df.columns:
+            print("⚠️ 'Ticker' column missing.")
             return
-
-        # 🧼 Clean value columns
-        for col in value_cols:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # ✅ Normalize tickers
         df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
         tickers = df["Normalized Ticker"].dropna().unique().tolist()
 
-        # 📈 Momentum: 6-month return
-        raw_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
-        if raw_data.empty:
+        # 📈 Download price data for momentum
+        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False)
+        if price_data.empty:
             print("⚠️ Price data download failed.")
             return
 
-        if isinstance(raw_data.columns, pd.MultiIndex) and "Adj Close" in raw_data.columns.levels[0]:
-            price_data = raw_data["Adj Close"]
-        elif "Adj Close" in raw_data.columns:
-            price_data = raw_data["Adj Close"]
+        if isinstance(price_data.columns, pd.MultiIndex) and "Adj Close" in price_data.columns.levels[0]:
+            adj_close = price_data["Adj Close"]
+        elif "Adj Close" in price_data.columns:
+            adj_close = price_data["Adj Close"]
         else:
             print("⚠️ 'Adj Close' not found.")
             return
 
-        returns = price_data.pct_change(fill_method=None).dropna()
+        returns = adj_close.pct_change(fill_method=None).dropna()
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 🧠 Value Composite Score (VCS)
-        for col in value_cols:
-            df[f"{col}_Rank"] = df[col].rank(ascending=True)
-        df["VCS"] = df[[f"{col}_Rank" for col in value_cols]].mean(axis=1)
+        # 📊 Fetch valuation ratios from yFinance
+        ratios = {}
+        for ticker in tickers:
+            try:
+                info = yf.Ticker(ticker).info
+                ratios[ticker] = {
+                    "PE": info.get("trailingPE"),
+                    "PB": info.get("priceToBook"),
+                    "EV_EBITDA": info.get("enterpriseToEbitda"),
+                    "P_Sales": info.get("priceToSalesTrailing12Months"),
+                    "P_CashFlow": info.get("operatingCashflow") and info.get("marketCap") / info.get("operatingCashflow")
+                }
+            except Exception as e:
+                print(f"⚠️ Failed to fetch ratios for {ticker}: {e}")
+                ratios[ticker] = {
+                    "PE": pd.NA, "PB": pd.NA, "EV_EBITDA": pd.NA, "P_Sales": pd.NA, "P_CashFlow": pd.NA
+                }
 
-        # 📊 Final Score
-        df["Momentum Rank"] = df["Normalized Ticker"].map(momentum_rank)
-        df["Final Score"] = df[["VCS", "Momentum Rank"]].mean(axis=1)
+        df_ratios = pd.DataFrame(ratios).T
+        df_ratios["Momentum Rank"] = momentum_rank
+
+        # 🧠 Value Composite Score (VCS)
+        value_cols = ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]
+        for col in value_cols:
+            df_ratios[col] = pd.to_numeric(df_ratios[col], errors="coerce")
+            df_ratios[f"{col}_Rank"] = df_ratios[col].rank(ascending=True)
+
+        df_ratios["VCS"] = df_ratios[[f"{col}_Rank" for col in value_cols]].mean(axis=1)
+        df_ratios["Final Score"] = df_ratios[["VCS", "Momentum Rank"]].mean(axis=1)
 
         # 🏁 Final output
-        df_final = df[["Ticker", "PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow", "VCS", "Momentum Rank", "Final Score"]].copy()
-        df_final = df_final.sort_values("Final Score").reset_index(drop=True)
+        df_final = df_ratios.reset_index().rename(columns={"index": "Ticker"})
         df_final["Signal"] = ""
         df_final.loc[:24, "Signal"] = "BUY"
 
@@ -133,4 +146,5 @@ class TrendingValueAnalyzer:
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet
+
 
