@@ -4,7 +4,9 @@ import time
 from core.columns import col
 import yfinance as yf
 import requests
+from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
+
 
 
 
@@ -80,37 +82,36 @@ class TrendingValueAnalyzer:
     def _normalize_ticker(self, ticker):
         return ticker.replace("NSE:", "").strip() + ".NS"
 
-    def _fetch_nse_ratios(self, ticker, sheet_pe=None):
+    def _scrape_screener_ratios(self, ticker):
         try:
-            session = requests.Session()
-            headers = {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json"
-            }
-            session.get("https://www.nseindia.com", headers=headers)
-            url = f"https://www.nseindia.com/api/quote-equity?symbol={ticker}"
-            response = session.get(url, headers=headers, timeout=5)
-            data = response.json()
-            meta = data.get("metadata", {})
+            url = f"https://www.screener.in/company/{ticker}/consolidated/"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            response = requests.get(url, headers=headers, timeout=5)
+            soup = BeautifulSoup(response.text, "html.parser")
 
-            pe_value = sheet_pe if pd.notna(sheet_pe) else meta.get("pE")
+            def extract(label):
+                try:
+                    cell = soup.find("td", string=label)
+                    if cell:
+                        return pd.to_numeric(cell.find_next("td").text.strip().replace(",", ""), errors="coerce")
+                except:
+                    return pd.NA
 
             return {
-                "PE": pe_value,
-                "PB": meta.get("bookValue") and meta.get("lastPrice") / meta.get("bookValue"),
-                "EV_EBITDA": pd.NA,
-                "P_Sales": pd.NA,
-                "P_CashFlow": pd.NA
+                "PE": extract("P/E"),
+                "PB": extract("P/BV"),
+                "EV_EBITDA": extract("EV / EBITDA"),
+                "P_Sales": extract("Price to Sales"),
+                "P_CashFlow": extract("Price to Cash Flow")
             }
         except Exception as e:
-            print(f"⚠️ NSE fetch failed for {ticker}: {e}")
+            print(f"⚠️ Screener fetch failed for {ticker}: {e}")
             return {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
 
-    def _fetch_all_nse_ratios(self, tickers, sheet_pe_map):
+    def _fetch_all_ratios(self, tickers):
         def fetch(ticker):
-            nse_ticker = ticker.replace(".NS", "")
-            sheet_pe = sheet_pe_map.get(ticker, pd.NA)
-            return ticker, self._fetch_nse_ratios(nse_ticker, sheet_pe)
+            screener_ticker = ticker.replace(".NS", "")
+            return ticker, self._scrape_screener_ratios(screener_ticker)
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             results = executor.map(fetch, tickers)
@@ -120,8 +121,8 @@ class TrendingValueAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-        if "Ticker" not in df.columns or "PE" not in df.columns:
-            print("⚠️ 'Ticker' or 'PE' column missing.")
+        if "Ticker" not in df.columns:
+            print("⚠️ 'Ticker' column missing.")
             return
 
         df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
@@ -145,10 +146,8 @@ class TrendingValueAnalyzer:
         cumulative_returns = (1 + returns).prod() - 1
         momentum_rank = cumulative_returns.rank(ascending=False)
 
-        # 🧠 PE from sheet, rest from NSE (parallel)
-        sheet_pe_map = df.set_index("Normalized Ticker")["PE"].to_dict()
-        ratios = self._fetch_all_nse_ratios(tickers, sheet_pe_map)
-
+        # 📊 Valuation ratios from Screener.in
+        ratios = self._fetch_all_ratios(tickers)
         df_ratios = pd.DataFrame(ratios).T
         df_ratios["Momentum Rank"] = momentum_rank
 
@@ -170,4 +169,3 @@ class TrendingValueAnalyzer:
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet
-
