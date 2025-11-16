@@ -6,7 +6,6 @@ import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
-from Bharat_sm_data.Fundamentals.NSE import get_ratios
 
 
 
