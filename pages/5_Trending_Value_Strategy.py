@@ -17,19 +17,12 @@ runner = StrategyRunner("TrendingValue", STRATEGY_CONFIG["TrendingValue"])
 runner.run()
 analysis_df = runner.analyzer.analysis_df
 
-# 📊 Display results
-if analysis_df.empty:
-    st.info("No analysis data available.")
-else:
-    analysis_df = analysis_df.fillna(pd.NA)
-    st.dataframe(
-        analysis_df[
-            ["Ticker", "Final Rank"]
-        ].style.format({
-            "Final Rank": "{:.2f}"
-        }),
-        width="stretch"
-    )
+# 📋 TrendingValueStocks Sheet Summary
+summary_df = runner.analyzer.get_sheet_summary()
+if not summary_df.empty:
+    st.subheader("📋 TrendingValueStocks Buy Table")
+    st.dataframe(summary_df.style.format({"Price": "₹{:.2f}", "Final Rank": "{:.2f}"}))
+
 
 # 🔙 Navigation
 with st.container():

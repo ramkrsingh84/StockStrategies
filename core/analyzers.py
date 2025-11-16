@@ -79,8 +79,30 @@ class TrendingValueAnalyzer:
         self.analysis_df = pd.DataFrame()
 
     def analyze_buy(self, df):
-        self.signal_log += []  # No SELL logic yet
+        # Store the sheet-driven buy table
+        self.analysis_df = df.copy()
+        self.signal_log = []  # No BUY logic needed
 
     def analyze_sell(self, df):
-        self.signal_log += []  # No SELL logic yet
+        self.signal_log += []  # No SELL logic needed
+
+    def get_sheet_summary(self):
+        if self.analysis_df.empty or "Ticker" not in self.analysis_df.columns:
+            return pd.DataFrame()
+
+        df = self.analysis_df.copy()
+        df["Normalized Ticker"] = df["Ticker"].astype(str).str.upper().str.replace("NSE:", "").str.strip() + ".NS"
+        tickers = df["Normalized Ticker"].dropna().unique().tolist()
+
+        price_data = yf.download(tickers, period="1d", interval="1d", progress=False, auto_adjust=False, threads=True)
+        if isinstance(price_data.columns, pd.MultiIndex) and "Adj Close" in price_data.columns.levels[0]:
+            prices = price_data["Adj Close"].iloc[-1]
+        elif "Adj Close" in price_data.columns:
+            prices = price_data["Adj Close"].iloc[-1]
+        else:
+            prices = pd.Series(index=tickers, data=pd.NA)
+
+        df["Price"] = df["Normalized Ticker"].map(prices)
+        return df[["Ticker", "Price", "Final Rank"]].copy()
+
 
