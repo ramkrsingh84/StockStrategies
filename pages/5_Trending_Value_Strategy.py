@@ -21,7 +21,19 @@ analysis_df = runner.analyzer.analysis_df
 summary_df = runner.analyzer.get_sheet_summary()
 if not summary_df.empty:
     st.subheader("📋 TrendingValueStocks Buy Table")
-    st.dataframe(summary_df.style.format({"Price": "₹{:.2f}", "Final Rank": "{:.2f}"}))
+
+    # Coerce to numeric for formatting, ignore errors
+    summary_df["Price"] = pd.to_numeric(summary_df["Price"], errors="coerce")
+    summary_df["Final Rank"] = pd.to_numeric(summary_df["Final Rank"], errors="coerce")
+
+    st.dataframe(
+        summary_df.style.format({
+            "Price": "₹{:.2f}",
+            "Final Rank": "{:.2f}"
+        }),
+        width="stretch"
+    )
+
 
 
 # 🔙 Navigation
