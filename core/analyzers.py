@@ -79,81 +79,8 @@ class TrendingValueAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-    def _normalize_ticker(self, ticker):
-        return ticker.replace("NSE:", "").strip() + ".NS"
-
-    def _fetch_ratios_bharat(self, ticker):
-        try:
-            ratios = get_ratios(ticker)
-            return {
-                "PE": ratios.get("pe_ratio"),
-                "PB": ratios.get("pb_ratio"),
-                "EV_EBITDA": ratios.get("ev_to_ebitda"),
-                "P_Sales": ratios.get("price_to_sales"),
-                "P_CashFlow": ratios.get("price_to_cash_flow")
-            }
-        except Exception as e:
-            print(f"⚠️ Bharat-SM fetch failed for {ticker}: {e}")
-            return {col: pd.NA for col in ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]}
-
-    def _fetch_all_ratios(self, tickers):
-        def fetch(ticker):
-            nse_ticker = ticker.replace(".NS", "")
-            return ticker, self._fetch_ratios_bharat(nse_ticker)
-
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            results = executor.map(fetch, tickers)
-        return dict(results)
-
     def analyze_buy(self, df):
-        self.signal_log = []
-        self.analysis_df = pd.DataFrame()
-
-        if "Ticker" not in df.columns:
-            print("⚠️ 'Ticker' column missing.")
-            return
-
-        df["Normalized Ticker"] = df["Ticker"].apply(self._normalize_ticker)
-        tickers = df["Normalized Ticker"].dropna().unique().tolist()
-
-        # 📈 Momentum from yFinance
-        price_data = yf.download(tickers, period="6mo", interval="1d", progress=False, auto_adjust=False, threads=True)
-        if price_data.empty:
-            print("⚠️ Price data download failed.")
-            return
-
-        if isinstance(price_data.columns, pd.MultiIndex) and "Adj Close" in price_data.columns.levels[0]:
-            adj_close = price_data["Adj Close"]
-        elif "Adj Close" in price_data.columns:
-            adj_close = price_data["Adj Close"]
-        else:
-            print("⚠️ 'Adj Close' not found.")
-            return
-
-        returns = adj_close.pct_change(fill_method=None).dropna()
-        cumulative_returns = (1 + returns).prod() - 1
-        momentum_rank = cumulative_returns.rank(ascending=False)
-
-        # 📊 Valuation ratios from Bharat-SM-Data
-        ratios = self._fetch_all_ratios(tickers)
-        df_ratios = pd.DataFrame(ratios).T
-        df_ratios["Momentum Rank"] = momentum_rank
-
-        # 🧠 Value Composite Score (VCS)
-        value_cols = ["PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow"]
-        for col in value_cols:
-            df_ratios[col] = pd.to_numeric(df_ratios[col], errors="coerce")
-            df_ratios[f"{col}_Rank"] = df_ratios[col].rank(ascending=True)
-
-        df_ratios["VCS"] = df_ratios[[f"{col}_Rank" for col in value_cols]].mean(axis=1)
-        df_ratios["Final Score"] = df_ratios[["VCS", "Momentum Rank"]].mean(axis=1)
-
-        df_final = df_ratios.reset_index().rename(columns={"index": "Ticker"})
-        df_final["Signal"] = ""
-        df_final.loc[:24, "Signal"] = "BUY"
-
-        self.analysis_df = df_final.copy()
-        self.signal_log = df_final[df_final["Signal"] == "BUY"].to_dict("records")
+        self.signal_log += []  # No SELL logic yet
 
     def analyze_sell(self, df):
         self.signal_log += []  # No SELL logic yet

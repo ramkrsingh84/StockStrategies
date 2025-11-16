@@ -18,7 +18,7 @@ STRATEGY_CONFIG = {
     "TrendingValue": {
         "sheet_name": "DMA_Data",
         "portfolio_tab": "Portfolio_TrendingValue",
-        "buy_tabs": ["Nifty_200"],
+        "buy_tabs": ["TrendingValueStocks"],
         "analyzer_class": TrendingValueAnalyzer,
         "sell_threshold_pct": 12
     }

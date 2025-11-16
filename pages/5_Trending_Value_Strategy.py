@@ -24,16 +24,9 @@ else:
     analysis_df = analysis_df.fillna(pd.NA)
     st.dataframe(
         analysis_df[
-            ["Ticker", "PE", "PB", "EV_EBITDA", "P_Sales", "P_CashFlow", "VCS", "Momentum Rank", "Final Score", "Signal"]
+            ["Ticker", "Final Rank"]
         ].style.format({
-            "PE": "{:.2f}",
-            "PB": "{:.2f}",
-            "EV_EBITDA": "{:.2f}",
-            "P_Sales": "{:.2f}",
-            "P_CashFlow": "{:.2f}",
-            "VCS": "{:.2f}",
-            "Momentum Rank": "{:.0f}",
-            "Final Score": "{:.2f}"
+            "Final Rank": "{:.2f}"
         }),
         width="stretch"
     )
