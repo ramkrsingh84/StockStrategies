@@ -1,4 +1,5 @@
-from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, TrendingValueAnalyzer
+from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, TrendingValueAnalyzer, GARPAnalyzer
+
 
 STRATEGY_CONFIG = {
     "DMA": {
