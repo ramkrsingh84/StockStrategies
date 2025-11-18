@@ -26,6 +26,12 @@ class SignalAnalyzer:
                     "Signal": "BUY",
                     "Price": round(float(row[col("current_price")]), 2)
                 })
+                # ✅ Add PEG if available
+                if col("PEG") in row and pd.notna(row[col("PEG")]):
+                    signal["PEG"] = round(float(row[col("PEG")]), 2)
+
+                self.signal_log.append(signal)
+
 
     def analyze_sell(self, df):
         if df.empty or col("sell_date") not in df.columns:
@@ -72,6 +78,11 @@ class ConsolidateAnalyzer(SignalAnalyzer):
                         "Signal": "BUY",
                         "Price": round(float(price), 2)
                     })
+                    # ✅ Add PEG if available
+                    if col("PEG") in row and pd.notna(row[col("PEG")]):
+                        signal["PEG"] = round(float(row[col("PEG")]), 2)
+
+                    self.signal_log.append(signal)
 
 class TrendingValueAnalyzer:
     def __init__(self, **kwargs):
