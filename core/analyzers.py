@@ -20,12 +20,12 @@ class SignalAnalyzer:
             if row[col("current_price")] > row[col("dma_100")] and \
                row[col("current_price")] > row[col("min_6m")] and \
                row[col("last_close")] < row[col("dma_100")]:
-                self.signal_log.append({
+                signal={
                     "Date": datetime.today().date(),
                     "Ticker": row[col("ticker")],
                     "Signal": "BUY",
                     "Price": round(float(row[col("current_price")]), 2)
-                })
+                }
                 # ✅ Add PEG if available
                 if col("PEG") in row and pd.notna(row[col("PEG")]):
                     signal["PEG"] = round(float(row[col("PEG")]), 2)
@@ -72,12 +72,12 @@ class ConsolidateAnalyzer(SignalAnalyzer):
 
             if pd.notna(high_date) and pd.notna(low_date) and high_date < low_date:
                 if all(0.95 * price < val < 1.05 * price for val in dma_vals):
-                    self.signal_log.append({
+                    signal={
                         "Date": datetime.today().date(),
                         "Ticker": row[col("ticker")],
                         "Signal": "BUY",
                         "Price": round(float(price), 2)
-                    })
+                    }
                     # ✅ Add PEG if available
                     if col("PEG") in row and pd.notna(row[col("PEG")]):
                         signal["PEG"] = round(float(row[col("PEG")]), 2)
