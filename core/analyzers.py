@@ -16,21 +16,29 @@ class SignalAnalyzer:
 
     def analyze_buy(self, df):
         df = df.dropna(subset=[col("current_price"), col("dma_100"), col("min_6m"), col("last_close")])
+
         for _, row in df.iterrows():
             if row[col("current_price")] > row[col("dma_100")] and \
                row[col("current_price")] > row[col("min_6m")] and \
                row[col("last_close")] < row[col("dma_100")]:
-                signal={
+
+                signal = {
                     "Date": datetime.today().date(),
                     "Ticker": row[col("ticker")],
                     "Signal": "BUY",
                     "Price": round(float(row[col("current_price")]), 2)
                 }
-                # ✅ Add PEG if available
-                if col("PEG") in row and pd.notna(row[col("PEG")]):
-                    signal["PEG"] = round(float(row[col("PEG")]), 2)
+
+                # ✅ Add PEG with fallback for #NA, N/A, etc.
+                peg_raw = row.get(col("PEG"), None)
+                try:
+                    peg_val = float(peg_raw)
+                    signal["PEG"] = round(peg_val, 2)
+                except (ValueError, TypeError):
+                    signal["PEG"] = "NA"
 
                 self.signal_log.append(signal)
+
 
 
     def analyze_sell(self, df):
@@ -78,9 +86,13 @@ class ConsolidateAnalyzer(SignalAnalyzer):
                         "Signal": "BUY",
                         "Price": round(float(price), 2)
                     }
-                    # ✅ Add PEG if available
-                    if col("PEG") in row and pd.notna(row[col("PEG")]):
-                        signal["PEG"] = round(float(row[col("PEG")]), 2)
+                    # ✅ Add PEG with fallback for #NA, N/A, etc.
+                    peg_raw = row.get(col("PEG"), None)
+                    try:
+                        peg_val = float(peg_raw)
+                        signal["PEG"] = round(peg_val, 2)
+                    except (ValueError, TypeError):
+                        signal["PEG"] = "NA"
 
                     self.signal_log.append(signal)
 
