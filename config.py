@@ -22,4 +22,11 @@ STRATEGY_CONFIG = {
         "analyzer_class": TrendingValueAnalyzer,
         "sell_threshold_pct": 12
     }
+    "GARP": {
+        "sheet_name": "DMA_Data",
+        "portfolio_tab": "Portfolio_GARP",
+        "buy_tabs": ["GARPStocks"],
+        "analyzer_class": GARPAnalyzer,
+        "sell_threshold_pct": 12
+    }
 }

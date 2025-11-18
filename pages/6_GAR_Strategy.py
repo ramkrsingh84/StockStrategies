@@ -1,0 +1,38 @@
+import streamlit as st
+import pandas as pd
+from config import STRATEGY_CONFIG
+from core.runner import StrategyRunner
+
+# 🔒 Auth check
+if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
+    st.warning("🔒 Please login from the Home page to access this section.")
+    st.stop()
+
+# 🧭 Page setup
+st.set_page_config(page_title="GARP Strategy", layout="wide")
+st.title("📊 GARP Strategy Analysis")
+
+# 🚀 Run strategy
+runner = StrategyRunner("GARP", STRATEGY_CONFIG["GARP"])
+runner.run()
+analysis_df = runner.analyzer.analysis_df
+
+# 📊 Display results
+if analysis_df.empty:
+    st.info("No analysis data available.")
+else:
+    analysis_df["Price"] = pd.to_numeric(analysis_df.get("Price", pd.NA), errors="coerce")
+    analysis_df["Final Rank"] = pd.to_numeric(analysis_df.get("Final Rank", pd.NA), errors="coerce")
+
+    st.dataframe(
+        analysis_df[["Ticker", "Price", "Final Rank"]].style.format({
+            "Price": "₹{:.2f}",
+            "Final Rank": "{:.2f}"
+        }),
+        use_container_width=True
+    )
+
+# 🔙 Navigation
+with st.container():
+    st.markdown("---")
+    st.page_link("main.py", label="⬅️ Back to Home", icon="🏠")
