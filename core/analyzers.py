@@ -114,18 +114,17 @@ class TrendingValueAnalyzer:
             return pd.DataFrame()
 
         df = self.analysis_df.copy()
-        df["Normalized Ticker"] = df["Ticker"].astype(str).str.upper().str.replace("NSE:", "").str.strip() + ".NS"
-        tickers = df["Normalized Ticker"].dropna().unique().tolist()
+        # Normalize column names
+        df.columns = df.columns.str.strip().str.lower()
+        df.rename(columns={
+            "ticker": "Ticker",
+            "current price": "Price",
+            "final rank": "Final Rank"
+        }, inplace=True)
 
-        price_data = yf.download(tickers, period="1d", interval="1d", progress=False, auto_adjust=False, threads=True)
-        if isinstance(price_data.columns, pd.MultiIndex) and "Adj Close" in price_data.columns.levels[0]:
-            prices = price_data["Adj Close"].iloc[-1]
-        elif "Adj Close" in price_data.columns:
-            prices = price_data["Adj Close"].iloc[-1]
-        else:
-            prices = pd.Series(index=tickers, data=pd.NA)
-
-        df["Price"] = df["Normalized Ticker"].map(prices)
+        # Coerce price to numeric and drop missing
+        df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+        df = df.dropna(subset=["Price"])
         return df[["Ticker", "Price", "Final Rank"]].copy()
 
 class GARPAnalyzer:
