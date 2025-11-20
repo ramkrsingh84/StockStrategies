@@ -158,16 +158,7 @@ class GARPAnalyzer:
         
         df["Price"] = df["Normalized Ticker"].map(prices)
         
-        st.write("📦 yFinance tickers returned:", prices.index.tolist())
-        st.write("📋 Normalized tickers:", df["Normalized Ticker"].unique().tolist())
-
-        
-        # ✅ Ensure column exists before checking
-        if "Price" in df.columns:
-            missing_price_tickers = df[df["Price"].isna()]["Ticker"].dropna().astype(str).tolist()
-            if missing_price_tickers:
-                st.warning("⚠️ Price not available for: " + ", ".join(missing_price_tickers))
-                st.write("🔍 Debug: Normalized tickers with missing price", df[df["Price"].isna()][["Ticker", "Normalized Ticker"]])
+        missing_price_tickers = df[df["Price"].isna()]["Ticker"].dropna().astype(str).tolist()
 
 
 
