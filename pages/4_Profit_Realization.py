@@ -36,20 +36,38 @@ if sell_price_col not in sold_df.columns:
 else:
     sold_df["Investment"] = sold_df[col("buy_price")] * sold_df[col("buy_qty")]
     sold_df["RealizedValue"] = sold_df[sell_price_col] * sold_df[col("buy_qty")]
+    sold_df["Profit"] = sold_df["RealizedValue"] - sold_df["Investment"]
 
+    # ✅ Per-strategy summary
+    strategy_summary = sold_df.groupby("Strategy").agg({
+        "Investment": "sum",
+        "RealizedValue": "sum",
+        "Profit": "sum"
+    }).reset_index()
+    strategy_summary["Profit %"] = (strategy_summary["Profit"] / strategy_summary["Investment"]) * 100
+
+    # Format for display
+    strategy_summary_display = strategy_summary.copy()
+    strategy_summary_display["Investment"] = strategy_summary_display["Investment"].apply(lambda x: f"₹{x:,.2f}")
+    strategy_summary_display["RealizedValue"] = strategy_summary_display["RealizedValue"].apply(lambda x: f"₹{x:,.2f}")
+    strategy_summary_display["Profit"] = strategy_summary_display["Profit"].apply(lambda x: f"₹{x:,.2f}")
+    strategy_summary_display["Profit %"] = strategy_summary_display["Profit %"].apply(lambda x: f"{x:.2f}%")
+
+    st.subheader("📊 Strategy-wise Realized Profit")
+    st.table(strategy_summary_display)
+
+    # ✅ Overall totals
     total_investment = sold_df["Investment"].sum()
     total_realized = sold_df["RealizedValue"].sum()
     total_profit = total_realized - total_investment
     profit_pct = (total_profit / total_investment * 100) if total_investment > 0 else 0
 
-    # ✅ Load surcharges and sum all charges
     surcharge_df = runner.portfolio_mgr.load_surcharges()
     total_surcharge = surcharge_df["Charges"].sum() if "Charges" in surcharge_df.columns else 0
 
     net_profit = total_profit - total_surcharge
     net_profit_pct = (net_profit / total_investment * 100) if total_investment > 0 else 0
 
-    # ✅ Add total investment across all holdings
     total_investment_all = active_df[col("buy_price")].mul(active_df[col("buy_qty")], fill_value=0).sum()
 
     summary_df = pd.DataFrame({
@@ -75,8 +93,9 @@ else:
         ]
     })
 
-    st.subheader("💰 Realized Profit Summary")
+    st.subheader("💰 Overall Realized Profit Summary")
     st.table(summary_df)
+
 
 with st.expander("🧪 FD Return vs Realized Value (Sold Only)"):
     st.caption("Validation table for sold entries comparing FD return vs actual realized value.")
