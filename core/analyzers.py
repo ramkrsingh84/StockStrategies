@@ -154,6 +154,7 @@ class GARPAnalyzer:
         elif "Adj Close" in price_data.columns:
             prices = price_data["Adj Close"].iloc[-1]
         else:
+            print(tickers)
             prices = pd.Series(index=tickers, data=pd.NA)
 
         df["Price"] = df["Normalized Ticker"].map(prices)

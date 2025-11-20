@@ -49,5 +49,6 @@ elif authentication_status:
     st.page_link("pages/3_FD_Benchmark.py", label="🏦 FD Benchmark Comparison", icon="💰")
     st.page_link("pages/4_Profit_Realization.py", label="📈 Profit Realization", icon="💰")
     st.page_link("pages/5_Trending_Value_Strategy.py", label="📊 Trending Value Strategy", icon="📈")
+    st.page_link("pages/6_GARP_Strategy.py", label="📊 GARP Strategy", icon="📈")
 
 
