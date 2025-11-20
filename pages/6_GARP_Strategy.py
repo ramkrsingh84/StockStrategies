@@ -29,7 +29,7 @@ else:
             "Price": "₹{:.2f}",
             "Final Rank": "{:.2f}"
         }),
-        use_container_width=True
+        width="stretch"
     )
 
 # 🔙 Navigation

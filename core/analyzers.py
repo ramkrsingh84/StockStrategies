@@ -159,7 +159,7 @@ class GARPAnalyzer:
         # ✅ Print tickers with missing price
         missing_price_tickers = df.loc[df["Price"].isna(), "Ticker"].tolist()
         if missing_price_tickers:
-            print("⚠️ Price not available for:", ", ".join(missing_price_tickers))
+            st.warning("⚠️ Price not available for: " + ", ".join(missing_tickers))
 
 
         df["Price"] = df["Normalized Ticker"].map(prices)
