@@ -23,15 +23,6 @@ if analysis_df.empty:
 else:
     analysis_df["Price"] = pd.to_numeric(analysis_df.get("Price", pd.NA), errors="coerce")
     analysis_df["Final Rank"] = pd.to_numeric(analysis_df.get("Final Rank", pd.NA), errors="coerce")
-    
-    summary_df, missing_price_tickers = runner.analyzer.get_sheet_summary()
-    
-    if missing_price_tickers:
-        st.warning("⚠️ Price not available for: " + ", ".join(missing_price_tickers))
-
-    if not summary_df.empty:
-        summary_df["Price"] = pd.to_numeric(summary_df["Price"], errors="coerce")
-        summary_df["Final Rank"] = pd.to_numeric(summary_df["Final Rank"], errors="coerce")
 
 
     st.dataframe(
