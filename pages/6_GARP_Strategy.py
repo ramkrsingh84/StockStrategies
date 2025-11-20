@@ -18,15 +18,16 @@ runner.run()
 analysis_df = runner.analyzer.analysis_df
 
 # 📊 Display results
-if analysis_df.empty:
+summary_df = runner.analyzer.get_sheet_summary()
+if summary_df.empty:
     st.info("No analysis data available.")
 else:
-    analysis_df["Price"] = pd.to_numeric(analysis_df.get("Price", pd.NA), errors="coerce")
-    analysis_df["Final Rank"] = pd.to_numeric(analysis_df.get("Final Rank", pd.NA), errors="coerce")
+    summary_df["Price"] = pd.to_numeric(summary_df.get("Price", pd.NA), errors="coerce")
+    summary_df["Final Rank"] = pd.to_numeric(summary_df.get("Final Rank", pd.NA), errors="coerce")
 
 
     st.dataframe(
-        analysis_df[["Ticker", "Price", "Final Rank"]].style.format({
+        summary_df[["Ticker", "Price", "Final Rank"]].style.format({
             "Price": "₹{:.2f}",
             "Final Rank": "{:.2f}"
         }),
