@@ -160,8 +160,7 @@ class GARPAnalyzer:
         
         missing_price_tickers = df[df["Price"].isna()]["Ticker"].dropna().astype(str).tolist()
 
-
-
         
-        return df[["Ticker", "Price", "Final Rank"]].copy()
+        return df[["Ticker", "Price", "Final Rank"]].copy(), missing_price_tickers
+
 
