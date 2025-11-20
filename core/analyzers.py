@@ -154,8 +154,13 @@ class GARPAnalyzer:
         elif "Adj Close" in price_data.columns:
             prices = price_data["Adj Close"].iloc[-1]
         else:
-            print(tickers)
             prices = pd.Series(index=tickers, data=pd.NA)
+        
+        # ✅ Print tickers with missing price
+        missing_price_tickers = df.loc[df["Price"].isna(), "Ticker"].tolist()
+        if missing_price_tickers:
+            print("⚠️ Price not available for:", ", ".join(missing_price_tickers))
+
 
         df["Price"] = df["Normalized Ticker"].map(prices)
         return df[["Ticker", "Price", "Final Rank"]].copy()
