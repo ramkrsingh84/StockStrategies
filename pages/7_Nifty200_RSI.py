@@ -32,6 +32,8 @@ def load_ohlc_to_supabase(tickers, days=90):
                     "close": float(row["Close"]),
                     "volume": int(row["Volume"])
                 }).execute()
+                if resp.error:
+                    st.error(f"Supabase error for {ticker}: {resp.error}")
         except Exception as e:
             st.error(f"Error loading {ticker}: {e}")
 
