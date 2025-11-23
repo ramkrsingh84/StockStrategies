@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from core.strategy_runner import StrategyRunner
+from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 
 # 🔒 Auth check
