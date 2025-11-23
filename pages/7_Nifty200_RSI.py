@@ -280,15 +280,16 @@ if st.button("🧹 Prune OHLC Data"):
 # Interactive Chart Section
 # -------------------------------
 st.markdown("---")
-st.subheader("📊 Chart a Selected Ticker")
+st.subheader("📊 Chart Active Tickers")
 
-creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-fetcher = DataFetcher("DMA_Data", creds_dict)
-tickers_df = fetcher.fetch("Nifty_200")
+runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
+runner.run()
+summary_df = runner.analyzer.get_sheet_summary()
 
-if not tickers_df.empty and "Ticker" in tickers_df.columns:
-    tickers = tickers_df["Ticker"].dropna().tolist()
-    selected_ticker = st.selectbox("Select Ticker", tickers)
+active_tickers = summary_df[summary_df["Status"] == "Active"]["Ticker"].dropna().tolist()
+
+if active_tickers:
+    selected_ticker = st.selectbox("Select Active Ticker", active_tickers)
 
     if selected_ticker:
         # Normalize to Supabase format
@@ -299,6 +300,9 @@ if not tickers_df.empty and "Ticker" in tickers_df.columns:
             symbol = symbol + ".NS"
 
         plot_ticker_chart(symbol, days=180)
+else:
+    st.info("No Active tickers at the moment.")
+
 
 with st.container():
     st.markdown("---")
