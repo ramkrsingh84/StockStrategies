@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from core.analyzers import filter_trading_days
 import requests
+import zipfile
+import io
 
 
 
@@ -52,6 +54,72 @@ def prune_ohlc_data():
 
     supabase.table("ohlc_data").delete().not_.in_("ticker", normalized).execute()
     st.success(f"✅ Pruned OHLC data: kept last 2 years and only {len(normalized)} Nifty_200 tickers")
+
+def fetch_bhavcopy(date: datetime):
+    """
+    Fetch NSE bhavcopy for a given date.
+    """
+    date_str = date.strftime("%d%b%Y").upper()  # e.g. 23NOV2025
+    year = date.strftime("%Y")
+    month = date.strftime("%b").upper()
+
+    url = f"https://archives.nseindia.com/content/historical/EQUITIES/{year}/{month}/cm{date_str}bhav.csv.zip"
+
+    resp = requests.get(url, timeout=15)
+    if resp.status_code != 200:
+        return None
+
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    csv_file = zf.namelist()[0]
+    df = pd.read_csv(zf.open(csv_file))
+
+    # Keep only EQ series
+    df = df[df["SERIES"] == "EQ"]
+
+    payload = pd.DataFrame({
+        "ticker": "NSE:" + df["SYMBOL"].astype(str),
+        "trade_date": pd.to_datetime(df["TIMESTAMP"]).dt.strftime("%Y-%m-%d"),
+        "open": pd.to_numeric(df["OPEN"], errors="coerce"),
+        "high": pd.to_numeric(df["HIGH"], errors="coerce"),
+        "low": pd.to_numeric(df["LOW"], errors="coerce"),
+        "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
+        "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
+    })
+    return payload
+
+def load_bhavcopy_to_supabase(tickers, days=180):
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    supabase = create_client(url, key)
+
+    progress = st.progress(0)
+    status = st.empty()
+    success_count, fail_count = 0, 0
+
+    for i in range(days):
+        date = datetime.today() - timedelta(days=i)
+        payload = fetch_bhavcopy(date)
+        if payload is None or payload.empty:
+            fail_count += 1
+            continue
+
+        # ✅ Filter only tickers from Nifty_200 sheet
+        payload = payload[payload["ticker"].isin(tickers)]
+
+        if payload.empty:
+            continue
+
+        rows = payload.to_dict(orient="records")
+        resp = supabase.table("ohlc_data").upsert(rows).execute()
+        success_count += len(rows)
+
+        status.text(f"Inserted {len(rows)} rows for {date.strftime('%Y-%m-%d')}")
+        progress.progress((i+1)/days)
+
+    status.empty()
+    progress.empty()
+    st.success(f"📥 Completed bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}"
+
 
 # -------------------------------
 # OHLC Fetch + Normalize
@@ -330,6 +398,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
 # Buttons
 # -------------------------------
 if st.button("📥 Load OHLC Data"):
+    # 1. Get tickers from Google Sheet (Nifty_200 tab)
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
@@ -339,7 +408,11 @@ if st.button("📥 Load OHLC Data"):
         st.stop()
 
     tickers = tickers_df["Ticker"].dropna().tolist()
-    load_ohlc_to_supabase(tickers, days=90)
+    tickers = [t.strip().upper() for t in tickers]
+
+    # 2. Load bhavcopy data into Supabase, but filter only for Nifty_200 tickers
+    load_bhavcopy_to_supabase(tickers, days=180)
+
 
 if st.button("▶️ Run Strategy"):
     runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
