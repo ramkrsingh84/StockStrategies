@@ -239,7 +239,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         height=600
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 # -------------------------------
@@ -270,7 +270,7 @@ if st.button("▶️ Run Strategy"):
             summary_df[["Ticker", "RSI", "Signal", "Status", "Last date"]]
                 .sort_values(["Status", "Ticker"], ascending=[False, True])
                 .style.format({"RSI": "{:.2f}"}),
-            use_container_width=True
+            width="stretch"
         )
 
 if st.button("🧹 Prune OHLC Data"):
