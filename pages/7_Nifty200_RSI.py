@@ -21,29 +21,56 @@ def load_ohlc_to_supabase(tickers, days=90):
             data = yf.download(
                 ticker + ".NS",
                 period=f"{days}d",
-                interval="1d"
+                interval="1d",
+                auto_adjust=False,          # avoid adjusted columns/multiindex noise
+                group_by="column"           # ensure single-level columns
             )[["Open","High","Low","Close","Volume"]]
 
             if data.empty:
                 st.warning(f"No data for {ticker}")
                 continue
 
+            # Reset index so Date becomes a column
             data = data.reset_index()
-            data["trade_date"] = pd.to_datetime(data["Date"]).dt.strftime("%Y-%m-%d")
 
-            # Replace NaN with None for Supabase compatibility
+            # 1) Flatten any tuple/multiindex columns to strings
+            def flatten(col):
+                if isinstance(col, tuple):
+                    return "_".join(str(x) for x in col if x is not None)
+                return str(col)
+            data.columns = [flatten(c) for c in data.columns]
+
+            # 2) Ensure we have the expected column names
+            # Some versions produce 'Datetime' or 'Date' column names; unify to 'trade_date'
+            if "Date" in data.columns:
+                data["trade_date"] = pd.to_datetime(data["Date"]).dt.strftime("%Y-%m-%d")
+            elif "Datetime" in data.columns:
+                data["trade_date"] = pd.to_datetime(data["Datetime"]).dt.strftime("%Y-%m-%d")
+            else:
+                # If index name was something else, derive from the first column
+                first_col = data.columns[0]
+                data["trade_date"] = pd.to_datetime(data[first_col]).dt.strftime("%Y-%m-%d")
+
+            # 3) Replace NaN with None for Supabase compatibility
             data = data.where(pd.notnull(data), None)
 
-            # Convert to list of dicts
-            rows = data.to_dict(orient="records")
+            # 4) Keep only the columns we will insert, with lowercase names matching table schema
+            payload = pd.DataFrame({
+                "ticker": ticker + ".NS",
+                "trade_date": data["trade_date"],
+                "open": data["Open"],
+                "high": data["High"],
+                "low": data["Low"],
+                "close": data["Close"],
+                "volume": data["Volume"],
+            })
 
-            # Add ticker field to each row
-            for r in rows:
-                r["ticker"] = ticker + ".NS"
+            # 5) Convert to list of dicts (keys now plain strings)
+            rows = payload.to_dict(orient="records")
 
             if rows:
                 resp = supabase.table("ohlc_data").upsert(rows).execute()
-                st.write(f"{ticker} → Supabase response:", resp)
+                st.write(f"{ticker} → inserted rows: {len(rows)}; response error:", getattr(resp, "error", None))
             else:
                 st.warning(f"No valid OHLC rows for {ticker}")
 
