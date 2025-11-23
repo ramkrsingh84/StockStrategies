@@ -12,6 +12,7 @@ from core.analyzers import filter_trading_days
 import requests
 import zipfile
 import io
+import os
 
 
 # 🔒 Auth check
