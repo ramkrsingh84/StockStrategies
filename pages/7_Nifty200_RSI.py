@@ -167,25 +167,24 @@ def load_ohlc_to_supabase(tickers, days=180):
     total = len(tickers)
 
     for i, t in enumerate(tickers, start=1):
-        # Sheet gives "NSE:TICKER"
         symbol = t.strip().upper()
         if symbol.startswith("NSE:"):
-            raw_symbol = symbol.split("NSE:")[1]   # e.g. "ADANIENT"
+            raw_symbol = symbol.split("NSE:")[1]
         else:
             raw_symbol = symbol
 
         status.text(f"Processing {symbol} ({i}/{total})…")
         try:
             payload = fetch_ohlc_normalized_nse(raw_symbol, days=days)
+
             if payload is None or payload.empty:
                 st.error(f"❌ Skipping {symbol}: no OHLC data returned from NSE")
                 fail_count += 1
                 continue
 
-            # ✅ Store ticker in Supabase as "NSE:TICKER"
-            payload["ticker"] = symbol
-
+            payload["ticker"] = symbol  # store as NSE:TICKER
             rows = payload.to_dict(orient="records")
+
             resp = supabase.table("ohlc_data").upsert(rows).execute()
             st.write(f"✅ {symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
             success_count += 1
@@ -193,8 +192,10 @@ def load_ohlc_to_supabase(tickers, days=180):
         except Exception as e:
             st.error(f"❌ Error loading {symbol}: {e}")
             fail_count += 1
+            continue  # ✅ skip and move on
 
         progress.progress(i / total)
+
 
     status.empty()
     progress.empty()
