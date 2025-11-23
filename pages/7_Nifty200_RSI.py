@@ -118,7 +118,7 @@ def load_bhavcopy_to_supabase(tickers, days=180):
 
     status.empty()
     progress.empty()
-    st.success(f"📥 Completed bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}"
+    st.success(f"📥 Completed bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}")
 
 
 # -------------------------------
