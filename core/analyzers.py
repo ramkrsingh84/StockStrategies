@@ -165,6 +165,7 @@ class Nifty200RSIAnalyzer:
         self.supabase = supabase_client
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
+        self.active_signals = {}  # track active buy signals per ticker
 
     def compute_rsi(self, series, period=14):
         delta = series.diff()
@@ -173,46 +174,44 @@ class Nifty200RSIAnalyzer:
         avg_gain = gain.rolling(period).mean()
         avg_loss = loss.rolling(period).mean()
         rs = avg_gain / avg_loss
-        return 100 - (100 / (1 + rs))
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
 
-    def analyze_buy(self, tickers_df):
+    def analyze_buy(self, df):
         results = []
-        for _, row in tickers_df.iterrows():
-            ticker = str(row["Ticker"]).strip().upper() + ".NS"
-            peg = row.get("PEG", "NA")
+        for ticker in df["ticker"].unique():
+            sub = df[df["ticker"] == ticker].sort_values("trade_date")
+            sub["RSI"] = self.compute_rsi(sub["close"])
 
-            if not self.supabase:
-                continue
+            # Lookback window: last 30 trading days
+            recent = sub.tail(30)
+            latest_rsi = recent["RSI"].iloc[-1]
 
-            resp = self.supabase.table("ohlc_data").select("*").eq(
-                "ticker", ticker
-            ).order("trade_date", desc=True).limit(30).execute()
-            records = resp.data
-            if not records:
-                continue
+            # Check if RSI dipped ≤ 35 in last 30 days
+            dipped = (recent["RSI"] <= 35).any()
 
-            df = pd.DataFrame(records).sort_values("trade_date")
-            df["RSI"] = self.compute_rsi(df["close"])
+            # Check if latest RSI crossed ≥ 40
+            crossed_40 = latest_rsi >= 40
 
-            if len(df["RSI"]) < 2:
-                continue
+            # Check if latest RSI crossed ≥ 50
+            crossed_50 = latest_rsi >= 50
 
-            latest_rsi = df["RSI"].iloc[-1]
-            prev_rsi = df["RSI"].iloc[-2]
+            # Strategy logic
+            if dipped and crossed_40 and not crossed_50:
+                if not self.active_signals.get(ticker, False):
+                    results.append({
+                        "Ticker": ticker,
+                        "RSI": round(latest_rsi, 2),
+                        "Signal": "BUY"
+                    })
+                    self.active_signals[ticker] = True
 
-            if (34 <= prev_rsi <= 36) and (latest_rsi >= 40):
-                results.append({
-                    "Ticker": ticker,
-                    "RSI": round(latest_rsi, 2),
-                    "PEG": peg
-                })
+            if crossed_50:
+                # Clear signal
+                self.active_signals[ticker] = False
 
         self.analysis_df = pd.DataFrame(results)
-        return self.analysis_df
-    
-    def analyze_sell(self, df):
-        # RSI strategy has no SELL logic yet
-        self.signal_log += []
+        self.signal_log.extend(results)
 
     def get_sheet_summary(self):
         return self.analysis_df
