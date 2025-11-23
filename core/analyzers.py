@@ -239,11 +239,14 @@ class Nifty200RSIAnalyzer:
         if ohlc.empty:
             self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","Status","Last date"])
             return
+            
+        # 🔎 Filter trading days automatically
+        ohlc = filter_trading_days(ohlc)
 
         results = []
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = ohlc[ohlc["ticker"] == ticker].dropna(subset=["trade_date","close"]).sort_values("trade_date")
-            sub["rsi"] = self.compute_rsi(sub["close"])
+            sub["rsi"] = self.compute_rsi(sub["close"], period=14)
             recent = sub.tail(30)
 
             if recent.empty or recent["rsi"].isna().all():

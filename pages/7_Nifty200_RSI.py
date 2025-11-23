@@ -148,29 +148,49 @@ def load_ohlc_to_supabase(tickers, days=90):
     progress.empty()
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
+# Load holiday JSON
+with open("nse_holidays.json", "r") as f:
+    NSE_HOLIDAYS = json.load(f)
+
+def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    # Drop weekends
+    df = df[df["trade_date"].dt.dayofweek < 5]
+    # Drop NSE holidays
+    year = str(df["trade_date"].dt.year.iloc[-1])  # pick current year in data
+    holidays = pd.to_datetime(NSE_HOLIDAYS.get(year, []))
+    df = df[~df["trade_date"].isin(holidays)]
+    return df
+
+
 # -------------------------------
 # Chart with RSI & Signals
 # -------------------------------
-def compute_rsi_wilder(series, period=14):
+def compute_rsi_wilder(series: pd.Series, period=14) -> pd.Series:
+    """Compute RSI using Wilder's smoothing (matches Upstox)."""
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
 
-    # First average gain/loss = simple average
-    avg_gain = gain[:period+1].mean()
-    avg_loss = loss[:period+1].mean()
+    avg_gain = gain.iloc[1:period+1].mean()
+    avg_loss = loss.iloc[1:period+1].mean()
 
     rsi_values = [None] * len(series)
 
-    # Wilder smoothing thereafter
     for i in range(period+1, len(series)):
         avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
         avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
 
-        rs = avg_gain / avg_loss if avg_loss != 0 else 0
-        rsi_values[i] = 100 - (100 / (1 + rs))
+        if avg_loss == 0:
+            rsi = 100
+        else:
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+
+        rsi_values[i] = rsi
 
     return pd.Series(rsi_values, index=series.index)
+
 
 
 def compute_rsi_sma(series, period=14):
