@@ -61,18 +61,32 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
     """
     Fetch OHLC data from NSE for the given raw symbol (e.g. 'ADANIENT').
     """
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json",
+        "Referer": "https://www.nseindia.com/"
+    }
+    session.get("https://www.nseindia.com", headers=headers)  # establish cookies
+
     end_date = datetime.today().strftime("%d-%m-%Y")
     start_date = (datetime.today() - timedelta(days=days*2)).strftime("%d-%m-%Y")
 
     url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={raw_symbol}&series=EQ&from={start_date}&to={end_date}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(url, headers=headers)
+    resp = session.get(url, headers=headers)
 
     if resp.status_code != 200:
+        st.error(f"NSE API error for {raw_symbol}: {resp.status_code}")
         return None
 
-    data = resp.json().get("data", [])
+    try:
+        data = resp.json().get("data", [])
+    except Exception as e:
+        st.error(f"JSON parse error for {raw_symbol}: {e}")
+        return None
+
     if not data:
+        st.warning(f"No OHLC data returned for {raw_symbol}")
         return None
 
     df = pd.DataFrame(data)
@@ -87,6 +101,7 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
         "volume": pd.to_numeric(df["CH_TOT_TRADED_QTY"], errors="coerce"),
     })
     return payload.dropna(subset=["trade_date","close"])
+
 
 
 
@@ -163,7 +178,7 @@ def load_ohlc_to_supabase(tickers, days=180):
         try:
             payload = fetch_ohlc_normalized_nse(raw_symbol, days=days)
             if payload is None or payload.empty:
-                st.warning(f"No OHLC data for {symbol}")
+                st.error(f"❌ Skipping {symbol}: no OHLC data returned from NSE")
                 fail_count += 1
                 continue
 
@@ -172,18 +187,19 @@ def load_ohlc_to_supabase(tickers, days=180):
 
             rows = payload.to_dict(orient="records")
             resp = supabase.table("ohlc_data").upsert(rows).execute()
-            st.write(f"{symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
+            st.write(f"✅ {symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
             success_count += 1
 
         except Exception as e:
-            st.error(f"Error loading {symbol}: {e}")
+            st.error(f"❌ Error loading {symbol}: {e}")
             fail_count += 1
 
         progress.progress(i / total)
 
     status.empty()
     progress.empty()
-    st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
+    st.success(f"📥 Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
+
 
 
 
