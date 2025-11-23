@@ -9,10 +9,6 @@ from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from core.analyzers import filter_trading_days
-import requests
-import zipfile
-import io
-import os
 
 
 # 🔒 Auth check
@@ -56,165 +52,8 @@ def prune_ohlc_data():
     st.success(f"✅ Pruned OHLC data: kept last 2 years and only {len(normalized)} Nifty_200 tickers")
 
 # -------------------------------
-# Load holiday JSON
-# -------------------------------
-# 🔎 Load holiday JSON once at module level
-HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
-try:
-    with open(HOLIDAY_FILE, "r") as f:
-        HOLIDAYS = json.load(f)
-except FileNotFoundError:
-    HOLIDAYS = {}  # fallback if file missing
-
-def is_holiday(date: datetime) -> bool:
-    year = str(date.year)
-    return date.strftime("%Y-%m-%d") in HOLIDAYS.get(year, [])
-
-# -------------------------------
-# Fetch Bhavcopy
-# -------------------------------
-def fetch_bhavcopy(date: datetime):
-    day = date.strftime("%d")
-    month = date.strftime("%b").upper()
-    year = date.strftime("%Y")
-    date_str = f"{day}{month}{year}"
-
-    url = f"https://archives.nseindia.com/content/historical/EQUITIES/{year}/{month}/cm{date_str}bhav.csv.zip"
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": "https://www.nseindia.com/"
-    }
-
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        if r.status_code != 200:
-            return None
-
-        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-            csv_file = z.namelist()[0]
-            df = pd.read_csv(z.open(csv_file))
-
-        df = df[df["SERIES"] == "EQ"]
-
-        payload = pd.DataFrame({
-            "ticker": "NSE:" + df["SYMBOL"].astype(str),
-            "trade_date": pd.to_datetime(df["TIMESTAMP"]).dt.strftime("%Y-%m-%d"),
-            "open": pd.to_numeric(df["OPEN"], errors="coerce"),
-            "high": pd.to_numeric(df["HIGH"], errors="coerce"),
-            "low": pd.to_numeric(df["LOW"], errors="coerce"),
-            "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
-            "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
-        })
-        return payload
-    except Exception as e:
-        print(f"❌ Error fetching bhavcopy {date_str}: {e}")
-        return None
-
-
-def load_bhavcopy_last_two_years(tickers):
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
-    supabase = create_client(url, key)
-
-    progress = st.progress(0)
-    status = st.empty()
-    success_count, fail_count = 0, 0
-
-    start_date = datetime.today() - timedelta(days=730)
-    end_date = datetime.today()
-    total_days = (end_date - start_date).days
-
-    for i in range(total_days):
-        date = end_date - timedelta(days=i)
-
-        # Skip weekends and holidays
-        if date.weekday() >= 5 or is_holiday(date):
-            continue
-
-        payload = fetch_bhavcopy(date)
-        if payload is None or payload.empty:
-            fail_count += 1
-            continue
-
-        payload = payload[payload["ticker"].isin(tickers)]
-        if payload.empty:
-            continue
-
-        rows = payload.to_dict(orient="records")
-        supabase.table("ohlc_data").upsert(rows).execute()
-        success_count += len(rows)
-
-        status.text(f"Inserted {len(rows)} rows for {date.strftime('%Y-%m-%d')}")
-        progress.progress((i+1)/total_days)
-
-    status.empty()
-    progress.empty()
-    st.success(f"📥 Completed 2-year bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}")
-
-
-
-# -------------------------------
 # OHLC Fetch + Normalize
 # -------------------------------
-
-def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
-    """
-    Fetch OHLC data from NSE for the given raw symbol (e.g. 'ADANIENT').
-    """
-
-    session = requests.Session()
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/json",
-        "Referer": "https://www.nseindia.com/"
-    }
-
-    # 🔑 Step 1: establish cookies
-    session.get("https://www.nseindia.com", headers=headers, timeout=10)
-
-    # 🔑 Step 2: build URL
-    end_date = datetime.today().strftime("%d-%m-%Y")
-    start_date = (datetime.today() - timedelta(days=days*2)).strftime("%d-%m-%Y")
-    url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={raw_symbol}&series=EQ&from={start_date}&to={end_date}"
-
-    # 🔑 Step 3: call API with cookies + headers
-    resp = session.get(url, headers=headers, timeout=15)
-
-    # Debug logging
-    st.write(f"Status → {resp.status_code}")
-    st.write(f"Text sample → {resp.text[:300]}")
-
-    if resp.status_code != 200:
-        st.error(f"NSE API error for {raw_symbol}: {resp.status_code}")
-        return None
-
-    try:
-        data = resp.json().get("data", [])
-    except Exception as e:
-        st.error(f"❌ JSON parse failed for {raw_symbol}: {e}")
-        return None
-
-    if not data:
-        st.warning(f"⚠️ No OHLC data returned for {raw_symbol}")
-        return None
-
-    df = pd.DataFrame(data)
-    df["trade_date"] = pd.to_datetime(df["CH_TIMESTAMP"]).dt.strftime("%Y-%m-%d")
-
-    payload = pd.DataFrame({
-        "trade_date": df["trade_date"],
-        "open": pd.to_numeric(df["CH_OPENING_PRICE"], errors="coerce"),
-        "high": pd.to_numeric(df["CH_TRADE_HIGH_PRICE"], errors="coerce"),
-        "low": pd.to_numeric(df["CH_TRADE_LOW_PRICE"], errors="coerce"),
-        "close": pd.to_numeric(df["CH_CLOSING_PRICE"], errors="coerce"),
-        "volume": pd.to_numeric(df["CH_TOT_TRADED_QTY"], errors="coerce"),
-    })
-    return payload.dropna(subset=["trade_date","close"])
-
-
-
-
-
 def fetch_ohlc_normalized(ticker: str, days: int = 90):
     df = yf.download(
         ticker,
@@ -266,7 +105,7 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
 # -------------------------------
 # Supabase Loader
 # -------------------------------
-def load_ohlc_to_supabase(tickers, days=180):
+def load_ohlc_to_supabase(tickers, days=90):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
@@ -279,40 +118,37 @@ def load_ohlc_to_supabase(tickers, days=180):
     for i, t in enumerate(tickers, start=1):
         symbol = t.strip().upper()
         if symbol.startswith("NSE:"):
-            raw_symbol = symbol.split("NSE:")[1]
+            symbol = symbol.split("NSE:")[1] + ".NS"
         else:
-            raw_symbol = symbol
+            symbol = symbol + ".NS"
 
-        st.write(f"🔍 Raw symbol for {symbol} → {raw_symbol}")
         status.text(f"Processing {symbol} ({i}/{total})…")
         try:
-            payload = fetch_ohlc_normalized_nse(raw_symbol, days=days)
-
+            payload = fetch_ohlc_normalized(symbol, days=days)
             if payload is None or payload.empty:
-                st.error(f"❌ Skipping {symbol}: no OHLC data returned from NSE")
+                st.warning(f"No OHLC data for {symbol}")
                 fail_count += 1
                 continue
 
-            payload["ticker"] = symbol  # store as NSE:TICKER
             rows = payload.to_dict(orient="records")
+            if not rows:
+                st.warning(f"No valid rows after normalization for {symbol}")
+                fail_count += 1
+                continue
 
             resp = supabase.table("ohlc_data").upsert(rows).execute()
-            st.write(f"✅ {symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
+            st.write(f"{symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
             success_count += 1
 
         except Exception as e:
-            st.error(f"❌ Error loading {symbol}: {e}")
+            st.error(f"Error loading {symbol}: {e}")
             fail_count += 1
-            continue  # ✅ skip and move on
 
         progress.progress(i / total)
 
-
     status.empty()
     progress.empty()
-    st.success(f"📥 Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
-
-
+    st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
 
 # -------------------------------
@@ -430,7 +266,6 @@ def plot_ticker_chart(ticker: str, days: int = 180):
 # Buttons
 # -------------------------------
 if st.button("📥 Load OHLC Data"):
-    # 1. Get tickers from Google Sheet (Nifty_200 tab)
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
@@ -440,11 +275,7 @@ if st.button("📥 Load OHLC Data"):
         st.stop()
 
     tickers = tickers_df["Ticker"].dropna().tolist()
-    tickers = [t.strip().upper() for t in tickers]
-
-    # 2. Load bhavcopy data into Supabase, but filter only for Nifty_200 tickers
-    load_bhavcopy_last_two_years(tickers)
-
+    load_ohlc_to_supabase(tickers, days=90)
 
 if st.button("▶️ Run Strategy"):
     runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
