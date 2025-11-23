@@ -7,6 +7,7 @@ from core.fetcher import DataFetcher
 from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
+import plotly.graph_objects as go
 
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
@@ -19,19 +20,14 @@ st.title("📈 Nifty200 RSI Strategy Analysis")
 # -------------------------------
 # OHLC Pruning
 # -------------------------------
-
 def prune_ohlc_data():
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
 
-    # 1) Compute cutoff date (2 years ago)
     cutoff_date = (datetime.today() - timedelta(days=730)).date().isoformat()
-
-    # 2) Delete records older than cutoff_date
     supabase.table("ohlc_data").delete().lt("trade_date", cutoff_date).execute()
 
-    # 3) Get current tickers from Nifty_200 sheet
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
@@ -50,12 +46,8 @@ def prune_ohlc_data():
             symbol = symbol + ".NS"
         normalized.append(symbol)
 
-    # 4) Delete records for tickers not in normalized list
     supabase.table("ohlc_data").delete().not_.in_("ticker", normalized).execute()
-
     st.success(f"✅ Pruned OHLC data: kept last 2 years and only {len(normalized)} Nifty_200 tickers")
-
-
 
 # -------------------------------
 # OHLC Fetch + Normalize
@@ -72,7 +64,6 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
     if df is None or df.empty:
         return None
 
-    # Handle MultiIndex columns
     if isinstance(df.columns, pd.MultiIndex):
         try:
             df = df.xs(ticker, axis=1, level=0)
@@ -83,15 +74,11 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
         df.columns = [str(c) for c in df.columns]
 
     df = df.reset_index()
-
-    # Find date column
     date_col = next((c for c in ["Date","Datetime","date","datetime"] if c in df.columns), df.columns[0])
     df.columns = [c.lower() for c in df.columns]
     date_col = date_col.lower()
-
     df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
 
-    # Map OHLC fields
     required_fields = {}
     for field in ["open","high","low","close","volume"]:
         if field in df.columns:
@@ -101,7 +88,6 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
             required_fields[field] = df[candidates[0]] if candidates else None
 
     df = df.where(pd.notnull(df), None)
-
     payload = pd.DataFrame({
         "ticker": ticker,
         "trade_date": df["trade_date"],
@@ -111,7 +97,6 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
         "close": required_fields["close"],
         "volume": required_fields["volume"],
     })
-
     payload = payload[payload["trade_date"].notnull()]
     return payload
 
@@ -129,7 +114,6 @@ def load_ohlc_to_supabase(tickers, days=90):
     total = len(tickers)
 
     for i, t in enumerate(tickers, start=1):
-        # Normalize ticker: NSE:ACC → ACC.NS
         symbol = t.strip().upper()
         if symbol.startswith("NSE:"):
             symbol = symbol.split("NSE:")[1] + ".NS"
@@ -165,6 +149,87 @@ def load_ohlc_to_supabase(tickers, days=90):
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
 # -------------------------------
+# Chart with RSI & Signals
+# -------------------------------
+def compute_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(period, min_periods=period).mean()
+    avg_loss = loss.rolling(period, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def plot_ticker_chart(ticker: str, days: int = 180):
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    supabase = create_client(url, key)
+
+    cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
+    resp = (
+        supabase.table("ohlc_data")
+        .select("*")
+        .eq("ticker", ticker)
+        .gte("trade_date", cutoff)
+        .order("trade_date")
+        .execute()
+    )
+    data = getattr(resp, "data", [])
+    if not data:
+        st.warning(f"No OHLC data found for {ticker}")
+        return
+
+    df = pd.DataFrame(data)
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    df["rsi"] = compute_rsi(df["close"])
+
+    # Identify buy/clear signals
+    buy_signals = df[(df["rsi"].shift(1) <= 35) & (df["rsi"] >= 40)]
+    clear_signals = df[df["rsi"] >= 50]
+
+    fig = go.Figure()
+
+    # Candlestick
+    fig.add_trace(go.Candlestick(
+        x=df["trade_date"],
+        open=df["open"], high=df["high"],
+        low=df["low"], close=df["close"],
+        name="OHLC"
+    ))
+
+    # RSI line
+    fig.add_trace(go.Scatter(
+        x=df["trade_date"], y=df["rsi"],
+        line=dict(color="blue"), name="RSI",
+        yaxis="y2"
+    ))
+
+    # Buy markers
+    fig.add_trace(go.Scatter(
+        x=buy_signals["trade_date"], y=buy_signals["rsi"],
+        mode="markers", marker=dict(color="green", size=10, symbol="triangle-up"),
+        name="BUY Signal", yaxis="y2"
+    ))
+
+    # Clear markers
+    fig.add_trace(go.Scatter(
+        x=clear_signals["trade_date"], y=clear_signals["rsi"],
+        mode="markers", marker=dict(color="red", size=10, symbol="x"),
+        name="Clear Signal", yaxis="y2"
+    ))
+
+    fig.update_layout(
+        title=f"{ticker} Price & RSI Strategy Signals",
+        xaxis=dict(domain=[0, 1]),
+        yaxis=dict(title="Price"),
+        yaxis2=dict(title="RSI", overlaying="y", side="right", range=[0,100]),
+        height=600
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
 # Buttons
 # -------------------------------
 if st.button("📥 Load OHLC Data"):
@@ -186,18 +251,41 @@ if st.button("▶️ Run Strategy"):
 
     if not summary_df.empty:
         st.subheader("📋 Nifty200 RSI Summary")
-        # Ensure numeric formatting for RSI
         summary_df["RSI"] = pd.to_numeric(summary_df["RSI"], errors="coerce")
 
         st.dataframe(
             summary_df[["Ticker", "RSI", "Signal", "Status", "Last date"]]
                 .sort_values(["Status", "Ticker"], ascending=[False, True])
                 .style.format({"RSI": "{:.2f}"}),
-            width="stretch"
+            use_container_width=True
         )
 
 if st.button("🧹 Prune OHLC Data"):
     prune_ohlc_data()
+
+# -------------------------------
+# Interactive Chart Section
+# -------------------------------
+st.markdown("---")
+st.subheader("📊 Chart a Selected Ticker")
+
+creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+fetcher = DataFetcher("DMA_Data", creds_dict)
+tickers_df = fetcher.fetch("Nifty_200")
+
+if not tickers_df.empty and "Ticker" in tickers_df.columns:
+    tickers = tickers_df["Ticker"].dropna().tolist()
+    selected_ticker = st.selectbox("Select Ticker", tickers)
+
+    if selected_ticker:
+        # Normalize to Supabase format
+        symbol = selected_ticker.strip().upper()
+        if symbol.startswith("NSE:"):
+            symbol = symbol.split("NSE:")[1] + ".NS"
+        elif not symbol.endswith(".NS"):
+            symbol = symbol + ".NS"
+
+        plot_ticker_chart(symbol, days=180)
 
 with st.container():
     st.markdown("---")
