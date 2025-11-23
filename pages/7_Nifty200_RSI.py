@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from core.nifty200_rsi_runner import Nifty200RSIRunner
-from core.strategy_config import STRATEGY_CONFIG
+from config import STRATEGY_CONFIG
 
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
