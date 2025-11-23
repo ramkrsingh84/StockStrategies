@@ -7,4 +7,5 @@ streamlit-authenticator==0.2.2
 matplotlib
 yfinance
 supabase
+plotly
 #force rebuild
