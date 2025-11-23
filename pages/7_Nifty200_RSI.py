@@ -155,10 +155,23 @@ def compute_rsi_wilder(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(period, min_periods=period).mean()
-    avg_loss = loss.rolling(period, min_periods=period).mean()
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+
+    # First average gain/loss = simple average
+    avg_gain = gain[:period+1].mean()
+    avg_loss = loss[:period+1].mean()
+
+    rsi_values = [None] * len(series)
+
+    # Wilder smoothing thereafter
+    for i in range(period+1, len(series)):
+        avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
+        avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
+
+        rs = avg_gain / avg_loss if avg_loss != 0 else 0
+        rsi_values[i] = 100 - (100 / (1 + rs))
+
+    return pd.Series(rsi_values, index=series.index)
+
 
 def compute_rsi_sma(series, period=14):
     delta = series.diff()
