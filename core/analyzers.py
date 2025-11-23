@@ -162,37 +162,29 @@ class GARPAnalyzer:
 
 
 class Nifty200RSIAnalyzer:
-    def __init__(self, supabase_client=None, sell_threshold_pct=12, **kwargs):
-        self.supabase = supabase_client
+    def __init__(self, sell_threshold_pct=12, **kwargs):
         self.sell_threshold_pct = sell_threshold_pct
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
-        self.active_signals = {}  # track active BUY signals per ticker
-
-    def _ensure_supabase(self):
-        if self.supabase is None:
-            import streamlit as st
-            url = st.secrets["supabase"]["url"]
-            key = st.secrets["supabase"]["key"]
-            self.supabase = create_client(url, key)
+        self.active_signals = {}
+        # Supabase client created only here, not in runner
+        import streamlit as st
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+        self.supabase = create_client(url, key)
 
     def _detect_ticker_column(self, df: pd.DataFrame) -> str:
-        """Detect ticker column in buy_df without renaming globally."""
-        for c in ["Ticker", "ticker", "Symbol", "symbol", "Instrument", "instrument"]:
+        for c in ["Ticker","ticker","Symbol","symbol","Instrument","instrument"]:
             if c in df.columns:
                 return c
-        # fallback heuristic
         for c in df.columns:
             if str(c).lower().startswith("tick") or str(c).lower().startswith("symb"):
                 return c
         raise KeyError("No ticker column found in buy_df")
 
     def _fetch_ohlc_for_tickers(self, tickers: list, days: int = 90) -> pd.DataFrame:
-        """Fetch last N days OHLC from Supabase for given tickers."""
-        self._ensure_supabase()
         from datetime import datetime, timedelta
         cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
-
         frames = []
         CHUNK = 100
         for i in range(0, len(tickers), CHUNK):
@@ -207,10 +199,8 @@ class Nifty200RSIAnalyzer:
             data = getattr(resp, "data", [])
             if data:
                 frames.append(pd.DataFrame(data))
-
         if not frames:
             return pd.DataFrame(columns=["ticker","trade_date","open","high","low","close","volume"])
-
         df = pd.concat(frames, ignore_index=True)
         df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
         for c in ["open","high","low","close","volume"]:
@@ -234,9 +224,7 @@ class Nifty200RSIAnalyzer:
             return
 
         ticker_col = self._detect_ticker_column(buy_df)
-        raw_tickers = (
-            buy_df[ticker_col].astype(str).str.strip().dropna().unique().tolist()
-        )
+        raw_tickers = buy_df[ticker_col].astype(str).str.strip().dropna().unique().tolist()
 
         normalized = []
         for t in raw_tickers:
@@ -254,11 +242,7 @@ class Nifty200RSIAnalyzer:
 
         results = []
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
-            sub = (
-                ohlc[ohlc["ticker"] == ticker]
-                .dropna(subset=["trade_date","close"])
-                .sort_values("trade_date")
-            )
+            sub = ohlc[ohlc["ticker"] == ticker].dropna(subset=["trade_date","close"]).sort_values("trade_date")
             if sub.empty:
                 results.append({"Ticker":ticker,"RSI":None,"Signal":"","Status":"Inactive","Last date":None})
                 continue
@@ -277,16 +261,10 @@ class Nifty200RSIAnalyzer:
             crossed_40 = pd.notna(latest_rsi) and latest_rsi >= 40
             crossed_50 = pd.notna(latest_rsi) and latest_rsi >= 50
 
-            status = "Active" if self.active_signals.get(ticker, False) else "Inactive"
-
             if crossed_50:
                 self.active_signals[ticker] = False
-                status = "Inactive"
-
-            if dipped_35 and crossed_40 and not crossed_50:
-                if not self.active_signals.get(ticker, False):
-                    self.active_signals[ticker] = True
-                    status = "Active"
+            elif dipped_35 and crossed_40:
+                self.active_signals[ticker] = True
 
             results.append({
                 "Ticker":ticker,
@@ -300,9 +278,9 @@ class Nifty200RSIAnalyzer:
         self.signal_log.extend(results)
 
     def analyze_sell(self, portfolio_df: pd.DataFrame):
-        # Keep separate; implement if needed
         pass
 
     def get_sheet_summary(self) -> pd.DataFrame:
         return self.analysis_df
+
 
