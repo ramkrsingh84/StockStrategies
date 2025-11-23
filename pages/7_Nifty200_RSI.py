@@ -17,6 +17,47 @@ st.set_page_config(page_title="Nifty200 RSI Strategy", layout="wide")
 st.title("📈 Nifty200 RSI Strategy Analysis")
 
 # -------------------------------
+# OHLC Pruning
+# -------------------------------
+
+def prune_ohlc_data():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    supabase = create_client(url, key)
+
+    # 1) Compute cutoff date (2 years ago)
+    cutoff_date = (datetime.today() - timedelta(days=730)).date().isoformat()
+
+    # 2) Delete records older than cutoff_date
+    supabase.table("ohlc_data").delete().lt("trade_date", cutoff_date).execute()
+
+    # 3) Get current tickers from Nifty_200 sheet
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+    fetcher = DataFetcher("DMA_Data", creds_dict)
+    tickers_df = fetcher.fetch("Nifty_200")
+
+    if tickers_df.empty or "Ticker" not in tickers_df.columns:
+        st.error("No tickers found in Nifty_200 tab.")
+        return
+
+    tickers = tickers_df["Ticker"].dropna().tolist()
+    normalized = []
+    for t in tickers:
+        symbol = t.strip().upper()
+        if symbol.startswith("NSE:"):
+            symbol = symbol.split("NSE:")[1] + ".NS"
+        else:
+            symbol = symbol + ".NS"
+        normalized.append(symbol)
+
+    # 4) Delete records for tickers not in normalized list
+    supabase.table("ohlc_data").delete().not_.in_("ticker", normalized).execute()
+
+    st.success(f"✅ Pruned OHLC data: kept last 2 years and only {len(normalized)} Nifty_200 tickers")
+
+
+
+# -------------------------------
 # OHLC Fetch + Normalize
 # -------------------------------
 def fetch_ohlc_normalized(ticker: str, days: int = 90):
@@ -155,6 +196,9 @@ if st.button("▶️ Run Strategy"):
             }),
             use_container_width=True
         )
+
+if st.button("🧹 Prune OHLC Data"):
+    prune_ohlc_data()
 
 with st.container():
     st.markdown("---")
