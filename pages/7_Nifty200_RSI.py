@@ -8,6 +8,7 @@ from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+from core.analyzers import filter_trading_days
 
 
 # 🔒 Auth check
