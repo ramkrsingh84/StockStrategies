@@ -31,17 +31,15 @@ def load_ohlc_to_supabase(tickers, days=90):
             data = data.reset_index()
             data["trade_date"] = pd.to_datetime(data["Date"]).dt.strftime("%Y-%m-%d")
 
-            rows = []
-            for _, row in data.iterrows():
-                rows.append({
-                    "ticker": ticker + ".NS",
-                    "trade_date": row["trade_date"],   # ✅ now a clean string
-                    "open": float(row["Open"]) if not pd.isna(row["Open"]) else None,
-                    "high": float(row["High"]) if not pd.isna(row["High"]) else None,
-                    "low": float(row["Low"]) if not pd.isna(row["Low"]) else None,
-                    "close": float(row["Close"]) if not pd.isna(row["Close"]) else None,
-                    "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else None
-                })
+            # Replace NaN with None for Supabase compatibility
+            data = data.where(pd.notnull(data), None)
+
+            # Convert to list of dicts
+            rows = data.to_dict(orient="records")
+
+            # Add ticker field to each row
+            for r in rows:
+                r["ticker"] = ticker + ".NS"
 
             if rows:
                 resp = supabase.table("ohlc_data").upsert(rows).execute()
