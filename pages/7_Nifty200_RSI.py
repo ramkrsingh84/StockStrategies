@@ -48,29 +48,22 @@ def _normalize_tickers(df):
     return normalized
 
 def _fetch_ohlc_for_ticker(ticker_ns: str, days: int = 30):
-    """Fetch last N trading days OHLC via yfinance for a '.NS' ticker."""
-    end = datetime.today()
-    start = end - timedelta(days=days * 2)  # buffer across weekends/holidays
-    df = yf.download(ticker_ns, start=start, end=end, progress=False, auto_adjust=False)
+    df = yf.download(ticker_ns, period="2y", interval="1d", progress=False, auto_adjust=False)
     if df.empty:
         return []
 
     df = df.tail(days)
     records = []
     for trade_dt, row in df.iterrows():
-        try:
-            records.append({
-                "ticker": ticker_ns,
-                "trade_date": trade_dt.date().isoformat(),
-                "open": float(row["Open"]) if pd.notna(row["Open"]) else None,
-                "high": float(row["High"]) if pd.notna(row["High"]) else None,
-                "low": float(row["Low"]) if pd.notna(row["Low"]) else None,
-                "close": float(row["Close"]) if pd.notna(row["Close"]) else None,
-                "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else None,
-            })
-        except Exception:
-            # Skip malformed rows but continue
-            continue
+        records.append({
+            "ticker": ticker_ns,
+            "trade_date": trade_dt.date().isoformat(),
+            "open": float(row["Open"]) if pd.notna(row["Open"]) else None,
+            "high": float(row["High"]) if pd.notna(row["High"]) else None,
+            "low": float(row["Low"]) if pd.notna(row["Low"]) else None,
+            "close": float(row["Close"]) if pd.notna(row["Close"]) else None,
+            "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else None,
+        })
     return records
 
 def _upsert_ohlc_batch(supabase, records):
