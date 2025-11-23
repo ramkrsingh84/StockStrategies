@@ -209,6 +209,10 @@ class Nifty200RSIAnalyzer:
 
         self.analysis_df = pd.DataFrame(results)
         return self.analysis_df
+    
+    def analyze_sell(self, df):
+        # RSI strategy has no SELL logic yet
+        self.signal_log += []
 
     def get_sheet_summary(self):
         return self.analysis_df
