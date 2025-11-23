@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from core.nifty200_rsi_runner import Nifty200RSIRunner
+from core.strategy_runner import StrategyRunner
 from config import STRATEGY_CONFIG
 
 # 🔒 Auth check
