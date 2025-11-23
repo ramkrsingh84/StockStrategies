@@ -243,35 +243,40 @@ class Nifty200RSIAnalyzer:
         results = []
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = ohlc[ohlc["ticker"] == ticker].dropna(subset=["trade_date","close"]).sort_values("trade_date")
-            if sub.empty:
-                results.append({"Ticker":ticker,"RSI":None,"Signal":"","Status":"Inactive","Last date":None})
-                continue
-
             sub["rsi"] = self.compute_rsi(sub["close"])
             recent = sub.tail(30)
+
             if recent.empty or recent["rsi"].isna().all():
-                results.append({
-                    "Ticker":ticker,"RSI":None,"Signal":"","Status":"Inactive",
-                    "Last date":sub["trade_date"].iloc[-1].date().isoformat()
-                })
                 continue
 
             latest_rsi = recent["rsi"].iloc[-1]
-            dipped_35 = (recent["rsi"] <= 35).any()
-            crossed_40 = pd.notna(latest_rsi) and latest_rsi >= 40
-            crossed_50 = pd.notna(latest_rsi) and latest_rsi >= 50
+            status = "Active" if self.active_signals.get(ticker, False) else "Inactive"
 
-            if crossed_50:
+            # --- Clear condition ---
+            if latest_rsi >= 55:
                 self.active_signals[ticker] = False
-            elif dipped_35 and crossed_40:
-                self.active_signals[ticker] = True
+                status = "Inactive"
+
+            # --- Trigger condition ---
+            dipped_points = recent[recent["rsi"] <= 35]
+            if not dipped_points.empty:
+                dip_index = dipped_points.index[-1]  # last dip
+                after_dip = recent.loc[dip_index:]
+
+                crossed_40 = (after_dip["rsi"] >= 40).any()
+                blocked = (after_dip["rsi"] >= 55).any()
+
+                if crossed_40 and not blocked:
+                    if not self.active_signals.get(ticker, False):
+                        self.active_signals[ticker] = True
+                        status = "Active"
 
             results.append({
-                "Ticker":ticker,
-                "RSI":round(latest_rsi,2) if pd.notna(latest_rsi) else None,
-                "Signal":"BUY" if self.active_signals.get(ticker, False) else "",
-                "Status":"Active" if self.active_signals.get(ticker, False) else "Inactive",
-                "Last date":recent["trade_date"].iloc[-1].date().isoformat()
+                "Ticker": ticker,
+                "RSI": round(latest_rsi, 2) if pd.notna(latest_rsi) else None,
+                "Signal": "BUY" if self.active_signals.get(ticker, False) else "",
+                "Status": status,
+                "Last date": recent["trade_date"].iloc[-1].date().isoformat()
             })
 
         self.analysis_df = pd.DataFrame(results)
