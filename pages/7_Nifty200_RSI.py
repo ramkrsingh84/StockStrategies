@@ -73,7 +73,17 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
     start_date = (datetime.today() - timedelta(days=days*2)).strftime("%d-%m-%Y")
 
     url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={raw_symbol}&series=EQ&from={start_date}&to={end_date}"
+    
+    st.write(f"📡 Fetching NSE data for {raw_symbol}")
+    st.write(f"URL → {url}")
+    
     resp = session.get(url, headers=headers)
+    
+    
+    st.write(f"Status → {resp.status_code}")
+    st.write(f"Headers → {resp.headers}")
+    st.write(f"Text → {resp.text[:500]}")  # show first 500 chars
+
 
     if resp.status_code != 200:
         st.error(f"NSE API error for {raw_symbol}: {resp.status_code}")
@@ -173,6 +183,7 @@ def load_ohlc_to_supabase(tickers, days=180):
         else:
             raw_symbol = symbol
 
+        st.write(f"🔍 Raw symbol for {symbol} → {raw_symbol}")
         status.text(f"Processing {symbol} ({i}/{total})…")
         try:
             payload = fetch_ohlc_normalized_nse(raw_symbol, days=days)
