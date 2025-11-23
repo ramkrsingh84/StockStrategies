@@ -19,6 +19,8 @@ def load_ohlc_to_supabase(tickers, days=90):
     for ticker in tickers:
         try:
             data = yf.download(ticker + ".NS", period=f"{days}d", interval="1d")[["Open","High","Low","Close","Volume"]]
+            st.write(f"{ticker} raw data shape:", data.shape)
+            st.write(data.tail())  # show last few rows
             if data.empty:
                 continue
             data = data.reset_index()
@@ -32,8 +34,12 @@ def load_ohlc_to_supabase(tickers, days=90):
                     "close": float(row["Close"]),
                     "volume": int(row["Volume"])
                 }).execute()
+            st.write(f"{ticker} rows prepared:", len(rows))
+            if rows:
                 resp = supabase.table("ohlc_data").upsert(rows).execute()
-                st.write(f"Ticker {ticker} → Response:", resp)   # 👈 print full response
+                st.write(f"{ticker} supabase response:", resp)
+            else:
+                st.warning(f"No valid OHLC rows for {ticker}")
         except Exception as e:
             st.error(f"Error loading {ticker}: {e}")
 
