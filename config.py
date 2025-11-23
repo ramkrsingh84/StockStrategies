@@ -31,9 +31,9 @@ STRATEGY_CONFIG = {
         "sell_threshold_pct": 12
     },
     "Nifty200_RSI": {
-        "sheet_name": "Nifty_200",
+        "sheet_name": "DMA_DATA",
         "portfolio_tab": "Portfolio_RSI",
-        "buy_tabs": ["Nifty200Stocks"],
+        "buy_tabs": ["Nifty_200"],
         "analyzer_class": Nifty200RSIAnalyzer,
         "sell_threshold_pct": 12
     }
