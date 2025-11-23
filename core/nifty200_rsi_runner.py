@@ -15,8 +15,8 @@ class Nifty200RSIRunner:
 
     def run(self):
         # Dynamically import analyzer
-        module = importlib.import_module("core.nifty200_rsi_analyzer")
-        analyzer_class = getattr(module, "Nifty200RSIAnalyzer")
+        module = importlib.import_module("core.analyzers")
+        analyzer_class = getattr(module, self.config["analyzer_class"])
         self.analyzer = analyzer_class(self.supabase)
 
         # Load tickers from Google Sheet (same as other strategies)
