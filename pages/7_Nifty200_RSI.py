@@ -57,35 +57,43 @@ def prune_ohlc_data():
 
 def fetch_bhavcopy(date: datetime):
     """
-    Fetch NSE bhavcopy for a given date.
+    Fetch NSE bhavcopy for a given trading date and return DataFrame.
     """
-    date_str = date.strftime("%d%b%Y").upper()  # e.g. 23NOV2025
+    day = date.strftime("%d")
+    month = date.strftime("%b").upper()   # NOV
     year = date.strftime("%Y")
-    month = date.strftime("%b").upper()
+    date_str = f"{day}{month}{year}"      # 21NOV2025
 
     url = f"https://archives.nseindia.com/content/historical/EQUITIES/{year}/{month}/cm{date_str}bhav.csv.zip"
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://www.nseindia.com/"
+    }
 
-    resp = requests.get(url, timeout=15)
-    if resp.status_code != 200:
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            csv_file = z.namelist()[0]
+            df = pd.read_csv(z.open(csv_file))
+
+        # Keep only EQ series
+        df = df[df["SERIES"] == "EQ"]
+
+        payload = pd.DataFrame({
+            "ticker": "NSE:" + df["SYMBOL"].astype(str),
+            "trade_date": pd.to_datetime(df["TIMESTAMP"]).dt.strftime("%Y-%m-%d"),
+            "open": pd.to_numeric(df["OPEN"], errors="coerce"),
+            "high": pd.to_numeric(df["HIGH"], errors="coerce"),
+            "low": pd.to_numeric(df["LOW"], errors="coerce"),
+            "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
+            "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
+        })
+        return payload
+    except Exception as e:
+        print(f"❌ Error fetching bhavcopy {date_str}: {e}")
         return None
-
-    zf = zipfile.ZipFile(io.BytesIO(resp.content))
-    csv_file = zf.namelist()[0]
-    df = pd.read_csv(zf.open(csv_file))
-
-    # Keep only EQ series
-    df = df[df["SERIES"] == "EQ"]
-
-    payload = pd.DataFrame({
-        "ticker": "NSE:" + df["SYMBOL"].astype(str),
-        "trade_date": pd.to_datetime(df["TIMESTAMP"]).dt.strftime("%Y-%m-%d"),
-        "open": pd.to_numeric(df["OPEN"], errors="coerce"),
-        "high": pd.to_numeric(df["HIGH"], errors="coerce"),
-        "low": pd.to_numeric(df["LOW"], errors="coerce"),
-        "close": pd.to_numeric(df["CLOSE"], errors="coerce"),
-        "volume": pd.to_numeric(df["TOTTRDQTY"], errors="coerce"),
-    })
-    return payload
 
 def load_bhavcopy_to_supabase(tickers, days=180):
     url = st.secrets["supabase"]["url"]
