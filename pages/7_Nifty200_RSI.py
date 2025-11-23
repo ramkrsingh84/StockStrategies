@@ -8,6 +8,7 @@ from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+import os
 
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
@@ -149,7 +150,8 @@ def load_ohlc_to_supabase(tickers, days=90):
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
 # Load holiday JSON
-with open("nse_holidays.json", "r") as f:
+HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "nse_holidays.json")
+with open(HOLIDAY_FILE, "r") as f:
     NSE_HOLIDAYS = json.load(f)
 
 def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
