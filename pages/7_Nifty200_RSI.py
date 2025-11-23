@@ -213,31 +213,27 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df["trade_date"] = pd.to_datetime(df["trade_date"])
     df["close"] = pd.to_numeric(df["close"], errors="coerce")
 
-    # Compute both RSIs
-    df["rsi_wilder"] = compute_rsi_wilder(df["close"])
-    df["rsi_sma"] = compute_rsi_sma(df["close"])
+    # 🔎 Filter trading days
+    df = filter_trading_days(df)
 
-    # --- Identify BUY signals (Wilder RSI only) ---
+    # Compute Wilder RSI
+    df["rsi"] = compute_rsi_wilder(df["close"], period=14)
+
+    # --- Identify BUY signals ---
     buy_points = []
     dipped = False
     for i in range(1, len(df)):
-        rsi_prev, rsi_now = df["rsi_wilder"].iloc[i-1], df["rsi_wilder"].iloc[i]
+        rsi_prev, rsi_now = df["rsi"].iloc[i-1], df["rsi"].iloc[i]
         if pd.isna(rsi_prev) or pd.isna(rsi_now):
             continue
 
-        # Reset cycle if RSI dips ≤ 35
         if rsi_now <= 35:
             dipped = True
-
-        # Clear cycle if RSI ≥ 55
         if rsi_now >= 55:
             dipped = False
-
-        # Trigger BUY if dipped and now crosses ≥ 40 (without hitting ≥ 55 yet)
         if dipped and rsi_prev < 40 and rsi_now >= 40:
             buy_points.append((df["trade_date"].iloc[i], rsi_now))
 
-    # --- Plot ---
     fig = go.Figure()
 
     # Candlestick
@@ -250,19 +246,12 @@ def plot_ticker_chart(ticker: str, days: int = 180):
 
     # Wilder RSI line
     fig.add_trace(go.Scatter(
-        x=df["trade_date"], y=df["rsi_wilder"],
+        x=df["trade_date"], y=df["rsi"],
         line=dict(color="blue"), name="RSI (Wilder)",
         yaxis="y2"
     ))
 
-    # SMA RSI line
-    fig.add_trace(go.Scatter(
-        x=df["trade_date"], y=df["rsi_sma"],
-        line=dict(color="orange", dash="dot"), name="RSI (SMA)",
-        yaxis="y2"
-    ))
-
-    # BUY markers (Wilder RSI only)
+    # BUY markers
     if buy_points:
         fig.add_trace(go.Scatter(
             x=[p[0] for p in buy_points],
@@ -273,7 +262,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         ))
 
     fig.update_layout(
-        title=f"{ticker} Price & RSI Comparison (Wilder vs SMA)",
+        title=f"{ticker} Price & Wilder RSI BUY Signals",
         xaxis=dict(domain=[0, 1]),
         yaxis=dict(title="Price"),
         yaxis2=dict(title="RSI", overlaying="y", side="right", range=[0,100]),

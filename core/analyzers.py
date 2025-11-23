@@ -236,8 +236,6 @@ class Nifty200RSIAnalyzer:
     def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
         """
         Compute RSI using Wilder's smoothing method (matches Upstox/TradingView).
-        - First average gain/loss = simple average of first N periods
-        - Subsequent averages use Wilder's recursive formula
         """
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
@@ -246,7 +244,7 @@ class Nifty200RSIAnalyzer:
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
 
-        # Initialize averages
+        # First average gain/loss = simple average of first N periods
         avg_gain = gain.iloc[1:period+1].mean()
         avg_loss = loss.iloc[1:period+1].mean()
 
