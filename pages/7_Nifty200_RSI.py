@@ -51,7 +51,7 @@ def _fetch_ohlc_for_ticker(ticker_ns: str, days: int = 30):
     """Fetch last N trading days OHLC via yfinance for a '.NS' ticker."""
     end = datetime.today()
     start = end - timedelta(days=days * 2)  # buffer across weekends/holidays
-    df = yf.download(ticker_ns, start=start, end=end, progress=False)
+    df = yf.download(ticker_ns, start=start, end=end, progress=False, auto_adjust=False)
     if df.empty:
         return []
 
@@ -91,6 +91,8 @@ if st.button("📥 Load OHLC Data"):
     tickers_df = fetcher.fetch("Nifty_200")
 
     tickers = _normalize_tickers(tickers_df)
+    st.write("Normalized tickers:", tickers[:10])
+
     if not tickers:
         st.error("No valid tickers found in Nifty_200 tab.")
         st.stop()
