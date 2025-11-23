@@ -14,7 +14,6 @@ import zipfile
 import io
 
 
-
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
     st.warning("🔒 Please login from the Home page to access this section.")
@@ -55,14 +54,29 @@ def prune_ohlc_data():
     supabase.table("ohlc_data").delete().not_.in_("ticker", normalized).execute()
     st.success(f"✅ Pruned OHLC data: kept last 2 years and only {len(normalized)} Nifty_200 tickers")
 
+# -------------------------------
+# Load holiday JSON
+# -------------------------------
+# 🔎 Load holiday JSON once at module level
+HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
+try:
+    with open(HOLIDAY_FILE, "r") as f:
+        NSE_HOLIDAYS = json.load(f)
+except FileNotFoundError:
+    NSE_HOLIDAYS = {}  # fallback if file missing
+
+def is_holiday(date: datetime) -> bool:
+    year = str(date.year)
+    return date.strftime("%Y-%m-%d") in HOLIDAYS.get(year, [])
+
+# -------------------------------
+# Fetch Bhavcopy
+# -------------------------------
 def fetch_bhavcopy(date: datetime):
-    """
-    Fetch NSE bhavcopy for a given trading date and return DataFrame.
-    """
     day = date.strftime("%d")
-    month = date.strftime("%b").upper()   # NOV
+    month = date.strftime("%b").upper()
     year = date.strftime("%Y")
-    date_str = f"{day}{month}{year}"      # 21NOV2025
+    date_str = f"{day}{month}{year}"
 
     url = f"https://archives.nseindia.com/content/historical/EQUITIES/{year}/{month}/cm{date_str}bhav.csv.zip"
     headers = {
@@ -72,13 +86,13 @@ def fetch_bhavcopy(date: datetime):
 
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
+        if r.status_code != 200:
+            return None
 
         with zipfile.ZipFile(io.BytesIO(r.content)) as z:
             csv_file = z.namelist()[0]
             df = pd.read_csv(z.open(csv_file))
 
-        # Keep only EQ series
         df = df[df["SERIES"] == "EQ"]
 
         payload = pd.DataFrame({
@@ -95,7 +109,8 @@ def fetch_bhavcopy(date: datetime):
         print(f"❌ Error fetching bhavcopy {date_str}: {e}")
         return None
 
-def load_bhavcopy_to_supabase(tickers, days=180):
+
+def load_bhavcopy_last_two_years(tickers):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
@@ -104,29 +119,37 @@ def load_bhavcopy_to_supabase(tickers, days=180):
     status = st.empty()
     success_count, fail_count = 0, 0
 
-    for i in range(days):
-        date = datetime.today() - timedelta(days=i)
+    start_date = datetime.today() - timedelta(days=730)
+    end_date = datetime.today()
+    total_days = (end_date - start_date).days
+
+    for i in range(total_days):
+        date = end_date - timedelta(days=i)
+
+        # Skip weekends and holidays
+        if date.weekday() >= 5 or is_holiday(date):
+            continue
+
         payload = fetch_bhavcopy(date)
         if payload is None or payload.empty:
             fail_count += 1
             continue
 
-        # ✅ Filter only tickers from Nifty_200 sheet
         payload = payload[payload["ticker"].isin(tickers)]
-
         if payload.empty:
             continue
 
         rows = payload.to_dict(orient="records")
-        resp = supabase.table("ohlc_data").upsert(rows).execute()
+        supabase.table("ohlc_data").upsert(rows).execute()
         success_count += len(rows)
 
         status.text(f"Inserted {len(rows)} rows for {date.strftime('%Y-%m-%d')}")
-        progress.progress((i+1)/days)
+        progress.progress((i+1)/total_days)
 
     status.empty()
     progress.empty()
-    st.success(f"📥 Completed bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}")
+    st.success(f"📥 Completed 2-year bhavcopy load. Success rows: {success_count}, Failed days: {fail_count}")
+
 
 
 # -------------------------------
