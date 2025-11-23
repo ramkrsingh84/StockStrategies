@@ -3,7 +3,6 @@ import pandas as pd
 class Nifty200RSIAnalyzer:
     def __init__(self, supabase_client):
         self.supabase = supabase_client
-        self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
     def compute_rsi(self, series, period=14):
@@ -21,8 +20,9 @@ class Nifty200RSIAnalyzer:
             ticker = str(row["Ticker"]).strip().upper() + ".NS"
             peg = row.get("PEG", "NA")
 
-            # Fetch OHLC from Supabase
-            resp = self.supabase.table("ohlc_data").select("*").eq("ticker", ticker).order("trade_date", desc=True).limit(30).execute()
+            resp = self.supabase.table("ohlc_data").select("*").eq(
+                "ticker", ticker
+            ).order("trade_date", desc=True).limit(30).execute()
             records = resp.data
             if not records:
                 continue
@@ -41,4 +41,7 @@ class Nifty200RSIAnalyzer:
                 })
 
         self.analysis_df = pd.DataFrame(results)
+        return self.analysis_df
+
+    def get_sheet_summary(self):
         return self.analysis_df

@@ -29,5 +29,10 @@ STRATEGY_CONFIG = {
         "buy_tabs": ["GARPStocks"],
         "analyzer_class": GARPAnalyzer,
         "sell_threshold_pct": 12
+    },
+    "Nifty200_RSI": {
+        "analyzer_class": "Nifty200RSIAnalyzer",
+        "sheet_name": "Nifty_200"   # your Google Sheet name
     }
+
 }
