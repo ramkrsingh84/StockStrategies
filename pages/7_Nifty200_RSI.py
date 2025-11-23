@@ -24,7 +24,7 @@ st.title("📈 Nifty200 RSI Strategy Analysis")
 
 
 def _normalize_tickers(df):
-    """Ensure 'Ticker' column exists, uppercase, dedupe, drop empties."""
+    """Convert tickers like 'NSE:ACC' → 'ACC.NS' for yfinance."""
     if "Ticker" not in df.columns:
         return []
     tickers = (
@@ -37,7 +37,15 @@ def _normalize_tickers(df):
         .unique()
         .tolist()
     )
-    return tickers
+    normalized = []
+    for t in tickers:
+        if t.startswith("NSE:"):
+            symbol = t.split("NSE:")[1]
+            normalized.append(f"{symbol}.NS")
+        else:
+            # fallback: just append .NS
+            normalized.append(f"{t}.NS")
+    return normalized
 
 def _fetch_ohlc_for_ticker(ticker_ns: str, days: int = 30):
     """Fetch last N trading days OHLC via yfinance for a '.NS' ticker."""
@@ -74,69 +82,58 @@ def _upsert_ohlc_batch(supabase, records):
 
 
 
-
-
-
 # 🚀 Buttons
 if st.button("📥 Load OHLC Data"):
     st.info("Reading tickers from DMA_Data → Nifty_200 and loading OHLC into Supabase…")
 
-    # 1) Read tickers from the sheet/tab
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
 
-    if tickers_df.empty or "Ticker" not in tickers_df.columns:
-        st.error("No tickers found in Nifty_200 tab. Please check the sheet and try again.")
-        st.stop()
-
     tickers = _normalize_tickers(tickers_df)
     if not tickers:
-        st.error("Ticker list is empty after normalization. Please verify the Nifty_200 tab.")
+        st.error("No valid tickers found in Nifty_200 tab.")
         st.stop()
 
-    # 2) Connect to Supabase
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
 
-    # 3) Process each ticker with progress and per‑ticker error isolation
     progress = st.progress(0)
     status = st.empty()
     success_count, fail_count = 0, 0
-    errors = []
 
     total = len(tickers)
     for i, t in enumerate(tickers, start=1):
-        status.text(f"Processing {t}.NS ({i}/{total})…")
+        status.text(f"Processing {t} ({i}/{total})…")
         try:
-            records = _fetch_ohlc_for_ticker(f"{t}.NS", days=30)
+            records = _fetch_ohlc_for_ticker(t, days=30)
             if records:
-                # Use small batches to keep payloads reasonable
-                batch_size = 500
-                for j in range(0, len(records), batch_size):
-                    _upsert_ohlc_batch(supabase, records[j:j+batch_size])
+                _upsert_ohlc_batch(supabase, records)
                 success_count += 1
             else:
                 fail_count += 1
-                errors.append(f"{t}: no OHLC data returned")
         except Exception as e:
             fail_count += 1
-            errors.append(f"{t}: {e}")
-
+            st.write(f"⚠️ {t}: {e}")
         progress.progress(i / total)
-        time.sleep(0.05)  # gentle pacing
 
-    # 4) Summary
     status.empty()
     progress.empty()
-
-    if errors:
-        with st.expander("⚠️ Details for failures"):
-            for msg in errors:
-                st.write(f"- {msg}")
-
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
+
+if st.button("🧹 Prune OHLC Data (keep 2 years)"):
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    supabase = create_client(url, key)
+
+    cutoff_date = (datetime.today() - timedelta(days=730)).date().isoformat()
+
+    # Delete rows older than cutoff_date
+    supabase.table("ohlc_data").delete().lt("trade_date", cutoff_date).execute()
+
+    st.success(f"✅ Pruned OHLC data, keeping only records since {cutoff_date}")
+
 
 if st.button("▶️ Run Strategy"):
     runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
