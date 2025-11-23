@@ -86,6 +86,8 @@ def _upsert_ohlc_batch(supabase, records):
 if st.button("📥 Load OHLC Data"):
     st.info("Reading tickers from DMA_Data → Nifty_200 and loading OHLC into Supabase…")
 
+    df = yf.download("ACC.NS", period="1mo")
+    print(df.head())
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
