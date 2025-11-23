@@ -32,8 +32,8 @@ def load_ohlc_to_supabase(tickers, days=90):
                     "close": float(row["Close"]),
                     "volume": int(row["Volume"])
                 }).execute()
-                if resp.error:
-                    st.error(f"Supabase error for {ticker}: {resp.error}")
+                resp = supabase.table("ohlc_data").upsert(rows).execute()
+                st.write(f"Ticker {ticker} → Response:", resp)   # 👈 print full response
         except Exception as e:
             st.error(f"Error loading {ticker}: {e}")
 
