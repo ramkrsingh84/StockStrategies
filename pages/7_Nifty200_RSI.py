@@ -184,9 +184,25 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df["close"] = pd.to_numeric(df["close"], errors="coerce")
     df["rsi"] = compute_rsi(df["close"])
 
-    # Identify buy/clear signals
-    buy_signals = df[(df["rsi"].shift(1) <= 35) & (df["rsi"] >= 40)]
-    clear_signals = df[df["rsi"] >= 50]
+    # --- Identify BUY signals with refined logic ---
+    buy_points = []
+    dipped = False
+    for i in range(1, len(df)):
+        rsi_prev, rsi_now = df["rsi"].iloc[i-1], df["rsi"].iloc[i]
+        if pd.isna(rsi_prev) or pd.isna(rsi_now):
+            continue
+
+        # Reset cycle if RSI dips ≤ 35
+        if rsi_now <= 35:
+            dipped = True
+
+        # Clear cycle if RSI ≥ 55
+        if rsi_now >= 55:
+            dipped = False
+
+        # Trigger BUY if dipped and now crosses ≥ 40 (without hitting ≥ 55 yet)
+        if dipped and rsi_prev < 40 and rsi_now >= 40:
+            buy_points.append((df["trade_date"].iloc[i], rsi_now))
 
     fig = go.Figure()
 
@@ -205,22 +221,18 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         yaxis="y2"
     ))
 
-    # Buy markers
-    fig.add_trace(go.Scatter(
-        x=buy_signals["trade_date"], y=buy_signals["rsi"],
-        mode="markers", marker=dict(color="green", size=10, symbol="triangle-up"),
-        name="BUY Signal", yaxis="y2"
-    ))
-
-    # Clear markers
-    fig.add_trace(go.Scatter(
-        x=clear_signals["trade_date"], y=clear_signals["rsi"],
-        mode="markers", marker=dict(color="red", size=10, symbol="x"),
-        name="Clear Signal", yaxis="y2"
-    ))
+    # BUY markers only
+    if buy_points:
+        fig.add_trace(go.Scatter(
+            x=[p[0] for p in buy_points],
+            y=[p[1] for p in buy_points],
+            mode="markers",
+            marker=dict(color="green", size=10, symbol="triangle-up"),
+            name="BUY Signal", yaxis="y2"
+        ))
 
     fig.update_layout(
-        title=f"{ticker} Price & RSI Strategy Signals",
+        title=f"{ticker} Price & RSI BUY Signals",
         xaxis=dict(domain=[0, 1]),
         yaxis=dict(title="Price"),
         yaxis2=dict(title="RSI", overlaying="y", side="right", range=[0,100]),
@@ -228,6 +240,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 # -------------------------------
 # Buttons
