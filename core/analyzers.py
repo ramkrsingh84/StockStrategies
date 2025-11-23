@@ -180,6 +180,8 @@ class Nifty200RSIAnalyzer:
 
     def analyze_buy(self, df):
         results = []
+        # Normalize column names to lowercase
+        df.columns = [c.lower() for c in df.columns]
         for ticker in df["ticker"].unique():
             sub = df[df["ticker"] == ticker].sort_values("trade_date")
             sub["RSI"] = self.compute_rsi(sub["close"])
