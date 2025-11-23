@@ -18,28 +18,36 @@ supabase = create_client(url, key)
 def load_ohlc_to_supabase(tickers, days=90):
     for ticker in tickers:
         try:
-            data = yf.download(ticker + ".NS", period=f"{days}d", interval="1d")[["Open","High","Low","Close","Volume"]]
-            st.write(f"{ticker} raw data shape:", data.shape)
-            st.write(data.tail())  # show last few rows
+            data = yf.download(
+                ticker + ".NS",
+                period=f"{days}d",
+                interval="1d"
+            )[["Open","High","Low","Close","Volume"]]
+
             if data.empty:
+                st.warning(f"No data for {ticker}")
                 continue
+
             data = data.reset_index()
+            rows = []
             for _, row in data.iterrows():
-                supabase.table("ohlc_data").upsert({
+                rows.append({
                     "ticker": ticker + ".NS",
-                    "trade_date": row["Date"].date().isoformat(),
-                    "open": float(row["Open"]),
-                    "high": float(row["High"]),
-                    "low": float(row["Low"]),
-                    "close": float(row["Close"]),
-                    "volume": int(row["Volume"])
-                }).execute()
-            st.write(f"{ticker} rows prepared:", len(rows))
+                    # ✅ FIXED: convert Timestamp to string date
+                    "trade_date": row["Date"].strftime("%Y-%m-%d"),
+                    "open": float(row["Open"]) if not pd.isna(row["Open"]) else None,
+                    "high": float(row["High"]) if not pd.isna(row["High"]) else None,
+                    "low": float(row["Low"]) if not pd.isna(row["Low"]) else None,
+                    "close": float(row["Close"]) if not pd.isna(row["Close"]) else None,
+                    "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else None
+                })
+
             if rows:
                 resp = supabase.table("ohlc_data").upsert(rows).execute()
-                st.write(f"{ticker} supabase response:", resp)
+                st.write(f"{ticker} → Supabase response:", resp)
             else:
                 st.warning(f"No valid OHLC rows for {ticker}")
+
         except Exception as e:
             st.error(f"Error loading {ticker}: {e}")
 
