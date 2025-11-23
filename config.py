@@ -31,8 +31,10 @@ STRATEGY_CONFIG = {
         "sell_threshold_pct": 12
     },
     "Nifty200_RSI": {
-        "analyzer_class": "Nifty200RSIAnalyzer",
-        "sheet_name": "Nifty_200"   # your Google Sheet name
+        "sheet_name": "Nifty_200",
+        "portfolio_tab": "Portfolio_RSI",
+        "buy_tabs": ["Nifty200Stocks"],
+        "analyzer_class": Nifty200RSIAnalyzer,
+        "sell_threshold_pct": 12
     }
-
 }
