@@ -151,7 +151,7 @@ def load_ohlc_to_supabase(tickers, days=90):
 # -------------------------------
 # Chart with RSI & Signals
 # -------------------------------
-def compute_rsi(series, period=14):
+def compute_rsi_wilder(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -159,6 +159,16 @@ def compute_rsi(series, period=14):
     avg_loss = loss.rolling(period, min_periods=period).mean()
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
+
+def compute_rsi_sma(series, period=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
 
 def plot_ticker_chart(ticker: str, days: int = 180):
     url = st.secrets["supabase"]["url"]
@@ -182,13 +192,16 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df = pd.DataFrame(data)
     df["trade_date"] = pd.to_datetime(df["trade_date"])
     df["close"] = pd.to_numeric(df["close"], errors="coerce")
-    df["rsi"] = compute_rsi(df["close"])
 
-    # --- Identify BUY signals with refined logic ---
+    # Compute both RSIs
+    df["rsi_wilder"] = compute_rsi_wilder(df["close"])
+    df["rsi_sma"] = compute_rsi_sma(df["close"])
+
+    # --- Identify BUY signals (Wilder RSI only) ---
     buy_points = []
     dipped = False
     for i in range(1, len(df)):
-        rsi_prev, rsi_now = df["rsi"].iloc[i-1], df["rsi"].iloc[i]
+        rsi_prev, rsi_now = df["rsi_wilder"].iloc[i-1], df["rsi_wilder"].iloc[i]
         if pd.isna(rsi_prev) or pd.isna(rsi_now):
             continue
 
@@ -204,6 +217,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         if dipped and rsi_prev < 40 and rsi_now >= 40:
             buy_points.append((df["trade_date"].iloc[i], rsi_now))
 
+    # --- Plot ---
     fig = go.Figure()
 
     # Candlestick
@@ -214,14 +228,21 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         name="OHLC"
     ))
 
-    # RSI line
+    # Wilder RSI line
     fig.add_trace(go.Scatter(
-        x=df["trade_date"], y=df["rsi"],
-        line=dict(color="blue"), name="RSI",
+        x=df["trade_date"], y=df["rsi_wilder"],
+        line=dict(color="blue"), name="RSI (Wilder)",
         yaxis="y2"
     ))
 
-    # BUY markers only
+    # SMA RSI line
+    fig.add_trace(go.Scatter(
+        x=df["trade_date"], y=df["rsi_sma"],
+        line=dict(color="orange", dash="dot"), name="RSI (SMA)",
+        yaxis="y2"
+    ))
+
+    # BUY markers (Wilder RSI only)
     if buy_points:
         fig.add_trace(go.Scatter(
             x=[p[0] for p in buy_points],
@@ -232,7 +253,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
         ))
 
     fig.update_layout(
-        title=f"{ticker} Price & RSI BUY Signals",
+        title=f"{ticker} Price & RSI Comparison (Wilder vs SMA)",
         xaxis=dict(domain=[0, 1]),
         yaxis=dict(title="Price"),
         yaxis2=dict(title="RSI", overlaying="y", side="right", range=[0,100]),
@@ -290,7 +311,6 @@ active_tickers = summary_df[summary_df["Status"] == "Active"]["Ticker"].dropna()
 
 if active_tickers:
     selected_ticker = st.selectbox("Select Active Ticker", active_tickers)
-
     if selected_ticker:
         # Normalize to Supabase format
         symbol = selected_ticker.strip().upper()
@@ -302,6 +322,7 @@ if active_tickers:
         plot_ticker_chart(symbol, days=180)
 else:
     st.info("No Active tickers at the moment.")
+
 
 
 with st.container():
