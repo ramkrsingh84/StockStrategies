@@ -8,7 +8,7 @@ from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
-import os
+
 
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
