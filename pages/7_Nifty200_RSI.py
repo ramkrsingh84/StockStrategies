@@ -149,21 +149,6 @@ def load_ohlc_to_supabase(tickers, days=90):
     progress.empty()
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
-# Load holiday JSON
-HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "nse_holidays.json")
-with open(HOLIDAY_FILE, "r") as f:
-    NSE_HOLIDAYS = json.load(f)
-
-def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
-    df["trade_date"] = pd.to_datetime(df["trade_date"])
-    # Drop weekends
-    df = df[df["trade_date"].dt.dayofweek < 5]
-    # Drop NSE holidays
-    year = str(df["trade_date"].dt.year.iloc[-1])  # pick current year in data
-    holidays = pd.to_datetime(NSE_HOLIDAYS.get(year, []))
-    df = df[~df["trade_date"].isin(holidays)]
-    return df
-
 
 # -------------------------------
 # Chart with RSI & Signals
