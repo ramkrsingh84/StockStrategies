@@ -187,14 +187,10 @@ if st.button("▶️ Run Strategy"):
     if not summary_df.empty:
         st.subheader("📋 Nifty200 RSI Buy Table")
         summary_df["RSI"] = pd.to_numeric(summary_df["RSI"], errors="coerce")
-        summary_df["PEG"] = pd.to_numeric(summary_df["PEG"], errors="coerce")
 
         st.dataframe(
-            summary_df.style.format({
-                "RSI": "{:.2f}",
-                "PEG": "{:.2f}"
-            }),
-            use_container_width=True
+            summary_df.style.format({"RSI": "{:.2f}"}),
+            width="stretch"
         )
 
 if st.button("🧹 Prune OHLC Data"):

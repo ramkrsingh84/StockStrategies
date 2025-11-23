@@ -165,7 +165,8 @@ class Nifty200RSIAnalyzer:
         self.supabase = supabase_client
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
-        self.active_signals = {}  # track active buy signals per ticker
+        # Track active signals per ticker
+        self.active_signals = {}
 
     def compute_rsi(self, series, period=14):
         delta = series.diff()
@@ -187,28 +188,38 @@ class Nifty200RSIAnalyzer:
             recent = sub.tail(30)
             latest_rsi = recent["RSI"].iloc[-1]
 
-            # Check if RSI dipped ≤ 35 in last 30 days
             dipped = (recent["RSI"] <= 35).any()
-
-            # Check if latest RSI crossed ≥ 40
             crossed_40 = latest_rsi >= 40
-
-            # Check if latest RSI crossed ≥ 50
             crossed_50 = latest_rsi >= 50
+
+            status = "Inactive"
 
             # Strategy logic
             if dipped and crossed_40 and not crossed_50:
                 if not self.active_signals.get(ticker, False):
+                    self.active_signals[ticker] = True
+                    status = "Active"
                     results.append({
                         "Ticker": ticker,
                         "RSI": round(latest_rsi, 2),
-                        "Signal": "BUY"
+                        "Signal": "BUY",
+                        "Status": status
                     })
-                    self.active_signals[ticker] = True
+                else:
+                    status = "Active"
 
             if crossed_50:
                 # Clear signal
                 self.active_signals[ticker] = False
+                status = "Inactive"
+
+            # Always include ticker in summary
+            results.append({
+                "Ticker": ticker,
+                "RSI": round(latest_rsi, 2),
+                "Signal": "BUY" if self.active_signals.get(ticker, False) else "",
+                "Status": "Active" if self.active_signals.get(ticker, False) else "Inactive"
+            })
 
         self.analysis_df = pd.DataFrame(results)
         self.signal_log.extend(results)
