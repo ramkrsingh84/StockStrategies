@@ -160,6 +160,29 @@ class GARPAnalyzer:
 
         return df[["Ticker", "Price", "Final Rank"]].copy()
 
+# 🔎 Load holiday JSON once at module level
+HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
+try:
+    with open(HOLIDAY_FILE, "r") as f:
+        NSE_HOLIDAYS = json.load(f)
+except FileNotFoundError:
+    NSE_HOLIDAYS = {}  # fallback if file missing
+
+def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop weekends and NSE holidays automatically."""
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    # Drop weekends
+    df = df[df["trade_date"].dt.dayofweek < 5]
+    # Drop NSE holidays
+    years = df["trade_date"].dt.year.unique()
+    all_holidays = []
+    for y in years:
+        all_holidays.extend(NSE_HOLIDAYS.get(str(y), []))
+    if all_holidays:
+        holidays = pd.to_datetime(all_holidays)
+        df = df[~df["trade_date"].isin(holidays)]
+    return df
+
 
 class Nifty200RSIAnalyzer:
     def __init__(self, sell_threshold_pct=12, **kwargs):
@@ -169,6 +192,7 @@ class Nifty200RSIAnalyzer:
         self.active_signals = {}
         # Supabase client created only here, not in runner
         import streamlit as st
+        from supabase import create_client
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["key"]
         self.supabase = create_client(url, key)
@@ -183,7 +207,7 @@ class Nifty200RSIAnalyzer:
         raise KeyError("No ticker column found in buy_df")
 
     def _fetch_ohlc_for_tickers(self, tickers: list, days: int = 90) -> pd.DataFrame:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
         frames = []
         CHUNK = 100
@@ -239,7 +263,7 @@ class Nifty200RSIAnalyzer:
         if ohlc.empty:
             self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","Status","Last date"])
             return
-            
+
         # 🔎 Filter trading days automatically
         ohlc = filter_trading_days(ohlc)
 
@@ -290,5 +314,4 @@ class Nifty200RSIAnalyzer:
 
     def get_sheet_summary(self) -> pd.DataFrame:
         return self.analysis_df
-
 
