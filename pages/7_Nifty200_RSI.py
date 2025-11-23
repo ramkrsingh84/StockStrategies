@@ -1,94 +1,83 @@
-import streamlit as st
+import json
 import pandas as pd
+import yfinance as yf
+import streamlit as st
+from supabase import create_client
+from core.fetcher import DataFetcher
 from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
-
-import yfinance as yf
-from supabase import create_client
-
-
-import json
-import time
 from datetime import datetime, timedelta
-from core.fetcher import DataFetcher  # uses your existing fetcher
-
 
 # 🔒 Auth check
 if "authentication_status" not in st.session_state or not st.session_state["authentication_status"]:
     st.warning("🔒 Please login from the Home page to access this section.")
     st.stop()
 
-# 🧭 Page setup
 st.set_page_config(page_title="Nifty200 RSI Strategy", layout="wide")
 st.title("📈 Nifty200 RSI Strategy Analysis")
 
-
-def _normalize_tickers(df):
-    """Convert tickers like 'NSE:ACC' → 'ACC.NS' for yfinance."""
-    if "Ticker" not in df.columns:
-        return []
-    tickers = (
-        df["Ticker"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-        .replace({"": pd.NA})
-        .dropna()
-        .unique()
-        .tolist()
+# -------------------------------
+# OHLC Fetch + Normalize
+# -------------------------------
+def fetch_ohlc_normalized(ticker: str, days: int = 90):
+    df = yf.download(
+        ticker,
+        period=f"{days}d",
+        interval="1d",
+        auto_adjust=False,
+        group_by="column",
+        progress=False
     )
-    normalized = []
-    for t in tickers:
-        if t.startswith("NSE:"):
-            symbol = t.split("NSE:")[1]
-            normalized.append(f"{symbol}.NS")
+    if df is None or df.empty:
+        return None
+
+    # Handle MultiIndex columns
+    if isinstance(df.columns, pd.MultiIndex):
+        try:
+            df = df.xs(ticker, axis=1, level=0)
+        except Exception:
+            pass
+        df.columns = ["_".join([str(x) for x in c if x is not None]) for c in df.columns]
+    else:
+        df.columns = [str(c) for c in df.columns]
+
+    df = df.reset_index()
+
+    # Find date column
+    date_col = next((c for c in ["Date","Datetime","date","datetime"] if c in df.columns), df.columns[0])
+    df.columns = [c.lower() for c in df.columns]
+    date_col = date_col.lower()
+
+    df["trade_date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
+
+    # Map OHLC fields
+    required_fields = {}
+    for field in ["open","high","low","close","volume"]:
+        if field in df.columns:
+            required_fields[field] = df[field]
         else:
-            # fallback: just append .NS
-            normalized.append(f"{t}.NS")
-    return normalized
+            candidates = [c for c in df.columns if c.endswith(f"_{field}") or c.startswith(f"{field}_")]
+            required_fields[field] = df[candidates[0]] if candidates else None
 
-def _fetch_ohlc_for_ticker(ticker_ns: str, days: int = 30):
-    df = yf.download(ticker_ns, period="2y", interval="1d", progress=False, auto_adjust=False)
-    if df.empty:
-        return []
+    df = df.where(pd.notnull(df), None)
 
-    df = df.tail(days)
-    records = []
-    for trade_dt, row in df.iterrows():
-        records.append({
-            "ticker": ticker_ns,
-            "trade_date": trade_dt.date().isoformat(),
-            "open": float(row["Open"]) if pd.notna(row["Open"]) else None,
-            "high": float(row["High"]) if pd.notna(row["High"]) else None,
-            "low": float(row["Low"]) if pd.notna(row["Low"]) else None,
-            "close": float(row["Close"]) if pd.notna(row["Close"]) else None,
-            "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else None,
-        })
-    return records
+    payload = pd.DataFrame({
+        "ticker": ticker,
+        "trade_date": df["trade_date"],
+        "open": required_fields["open"],
+        "high": required_fields["high"],
+        "low": required_fields["low"],
+        "close": required_fields["close"],
+        "volume": required_fields["volume"],
+    })
 
-def _upsert_ohlc_batch(supabase, records):
-    """Upsert a batch of records into Supabase ohlc_data."""
-    if not records:
-        return
-    # Upsert honors unique(ticker, trade_date)
-    supabase.table("ohlc_data").upsert(records).execute()
+    payload = payload[payload["trade_date"].notnull()]
+    return payload
 
-
-
-# 🚀 Buttons
-if st.button("📥 Load OHLC Data"):
-    st.info("Reading tickers from DMA_Data → Nifty_200 and loading OHLC into Supabase…")
-
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-    fetcher = DataFetcher("DMA_Data", creds_dict)
-    tickers_df = fetcher.fetch("Nifty_200")
-
-    tickers = _normalize_tickers(tickers_df)
-
-    if not tickers:
-        st.error("No valid tickers found in Nifty_200 tab.")
-        st.stop()
-
+# -------------------------------
+# Supabase Loader
+# -------------------------------
+def load_ohlc_to_supabase(tickers, days=90):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
@@ -96,50 +85,66 @@ if st.button("📥 Load OHLC Data"):
     progress = st.progress(0)
     status = st.empty()
     success_count, fail_count = 0, 0
-
     total = len(tickers)
+
     for i, t in enumerate(tickers, start=1):
-        status.text(f"Processing {t} ({i}/{total})…")
+        # Normalize ticker: NSE:ACC → ACC.NS
+        symbol = t.strip().upper()
+        if symbol.startswith("NSE:"):
+            symbol = symbol.split("NSE:")[1] + ".NS"
+        else:
+            symbol = symbol + ".NS"
+
+        status.text(f"Processing {symbol} ({i}/{total})…")
         try:
-            records = _fetch_ohlc_for_ticker(t, days=30)
-            st.write(t, type(records))
-            if len(records)>0:
-                _upsert_ohlc_batch(supabase, records)
-                success_count += 1
-            else:
+            payload = fetch_ohlc_normalized(symbol, days=days)
+            if payload is None or payload.empty:
+                st.warning(f"No OHLC data for {symbol}")
                 fail_count += 1
+                continue
+
+            rows = payload.to_dict(orient="records")
+            if not rows:
+                st.warning(f"No valid rows after normalization for {symbol}")
+                fail_count += 1
+                continue
+
+            resp = supabase.table("ohlc_data").upsert(rows).execute()
+            st.write(f"{symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
+            success_count += 1
+
         except Exception as e:
+            st.error(f"Error loading {symbol}: {e}")
             fail_count += 1
-            st.write(f"⚠️ {t}: {e}")
+
         progress.progress(i / total)
 
     status.empty()
     progress.empty()
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
-if st.button("🧹 Prune OHLC Data (keep 2 years)"):
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
-    supabase = create_client(url, key)
+# -------------------------------
+# Buttons
+# -------------------------------
+if st.button("📥 Load OHLC Data"):
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+    fetcher = DataFetcher("DMA_Data", creds_dict)
+    tickers_df = fetcher.fetch("Nifty_200")
 
-    cutoff_date = (datetime.today() - timedelta(days=730)).date().isoformat()
+    if tickers_df.empty or "Ticker" not in tickers_df.columns:
+        st.error("No tickers found in Nifty_200 tab.")
+        st.stop()
 
-    # Delete rows older than cutoff_date
-    supabase.table("ohlc_data").delete().lt("trade_date", cutoff_date).execute()
-
-    st.success(f"✅ Pruned OHLC data, keeping only records since {cutoff_date}")
-
+    tickers = tickers_df["Ticker"].dropna().tolist()
+    load_ohlc_to_supabase(tickers, days=90)
 
 if st.button("▶️ Run Strategy"):
     runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
     runner.run()
-    analysis_df = runner.analyzer.analysis_df
-
-    # 📋 RSI Sheet Summary
     summary_df = runner.analyzer.get_sheet_summary()
+
     if not summary_df.empty:
         st.subheader("📋 Nifty200 RSI Buy Table")
-
         summary_df["RSI"] = pd.to_numeric(summary_df["RSI"], errors="coerce")
         summary_df["PEG"] = pd.to_numeric(summary_df["PEG"], errors="coerce")
 
@@ -151,7 +156,6 @@ if st.button("▶️ Run Strategy"):
             use_container_width=True
         )
 
-# 🔙 Navigation
 with st.container():
     st.markdown("---")
     st.page_link("main.py", label="⬅️ Back to Home", icon="🏠")
