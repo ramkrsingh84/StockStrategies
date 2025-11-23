@@ -179,17 +179,6 @@ def compute_rsi_wilder(series: pd.Series, period=14) -> pd.Series:
     return pd.Series(rsi_values, index=series.index)
 
 
-
-def compute_rsi_sma(series, period=14):
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(period).mean()
-    avg_loss = loss.rolling(period).mean()
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-
 def plot_ticker_chart(ticker: str, days: int = 180):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
