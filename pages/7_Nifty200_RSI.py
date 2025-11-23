@@ -443,7 +443,7 @@ if st.button("📥 Load OHLC Data"):
     tickers = [t.strip().upper() for t in tickers]
 
     # 2. Load bhavcopy data into Supabase, but filter only for Nifty_200 tickers
-    load_bhavcopy_to_supabase(tickers, days=180)
+    load_bhavcopy_last_two_years(tickers)
 
 
 if st.button("▶️ Run Strategy"):
