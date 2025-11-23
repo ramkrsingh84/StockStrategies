@@ -79,14 +79,11 @@ def _upsert_ohlc_batch(supabase, records):
 if st.button("📥 Load OHLC Data"):
     st.info("Reading tickers from DMA_Data → Nifty_200 and loading OHLC into Supabase…")
 
-    df = yf.download("ACC.NS", period="1mo",progress=False, auto_adjust=False)
-    st.write("ACC.NS OHLC:", df.head())
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     fetcher = DataFetcher("DMA_Data", creds_dict)
     tickers_df = fetcher.fetch("Nifty_200")
 
     tickers = _normalize_tickers(tickers_df)
-    st.write("Normalized tickers:", tickers[:10])
 
     if not tickers:
         st.error("No valid tickers found in Nifty_200 tab.")
@@ -105,7 +102,8 @@ if st.button("📥 Load OHLC Data"):
         status.text(f"Processing {t} ({i}/{total})…")
         try:
             records = _fetch_ohlc_for_ticker(t, days=30)
-            if records:
+            st.write(t, type(records))
+            if len(records)>0:
                 _upsert_ohlc_batch(supabase, records)
                 success_count += 1
             else:
