@@ -61,29 +61,28 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
     """
     Fetch OHLC data from NSE for the given raw symbol (e.g. 'ADANIENT').
     """
+
     session = requests.Session()
     headers = {
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json",
         "Referer": "https://www.nseindia.com/"
     }
-    session.get("https://www.nseindia.com", headers=headers)  # establish cookies
 
+    # 🔑 Step 1: establish cookies
+    session.get("https://www.nseindia.com", headers=headers, timeout=10)
+
+    # 🔑 Step 2: build URL
     end_date = datetime.today().strftime("%d-%m-%Y")
     start_date = (datetime.today() - timedelta(days=days*2)).strftime("%d-%m-%Y")
-
     url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={raw_symbol}&series=EQ&from={start_date}&to={end_date}"
-    
-    st.write(f"📡 Fetching NSE data for {raw_symbol}")
-    st.write(f"URL → {url}")
-    
-    resp = session.get(url, headers=headers)
-    
-    
-    st.write(f"Status → {resp.status_code}")
-    st.write(f"Headers → {resp.headers}")
-    st.write(f"Text → {resp.text[:500]}")  # show first 500 chars
 
+    # 🔑 Step 3: call API with cookies + headers
+    resp = session.get(url, headers=headers, timeout=15)
+
+    # Debug logging
+    st.write(f"Status → {resp.status_code}")
+    st.write(f"Text sample → {resp.text[:300]}")
 
     if resp.status_code != 200:
         st.error(f"NSE API error for {raw_symbol}: {resp.status_code}")
@@ -92,11 +91,11 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
     try:
         data = resp.json().get("data", [])
     except Exception as e:
-        st.error(f"JSON parse error for {raw_symbol}: {e}")
+        st.error(f"❌ JSON parse failed for {raw_symbol}: {e}")
         return None
 
     if not data:
-        st.warning(f"No OHLC data returned for {raw_symbol}")
+        st.warning(f"⚠️ No OHLC data returned for {raw_symbol}")
         return None
 
     df = pd.DataFrame(data)
@@ -111,6 +110,7 @@ def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
         "volume": pd.to_numeric(df["CH_TOT_TRADED_QTY"], errors="coerce"),
     })
     return payload.dropna(subset=["trade_date","close"])
+
 
 
 
