@@ -62,9 +62,9 @@ def prune_ohlc_data():
 HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
 try:
     with open(HOLIDAY_FILE, "r") as f:
-        NSE_HOLIDAYS = json.load(f)
+        HOLIDAYS = json.load(f)
 except FileNotFoundError:
-    NSE_HOLIDAYS = {}  # fallback if file missing
+    HOLIDAYS = {}  # fallback if file missing
 
 def is_holiday(date: datetime) -> bool:
     year = str(date.year)
