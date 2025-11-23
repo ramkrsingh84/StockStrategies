@@ -54,6 +54,40 @@ def prune_ohlc_data():
 # -------------------------------
 # OHLC Fetch + Normalize
 # -------------------------------
+
+def fetch_ohlc_normalized_nse(raw_symbol: str, days: int = 180):
+    """
+    Fetch OHLC data from NSE for the given raw symbol (e.g. 'ADANIENT').
+    """
+    end_date = datetime.today().strftime("%d-%m-%Y")
+    start_date = (datetime.today() - timedelta(days=days*2)).strftime("%d-%m-%Y")
+
+    url = f"https://www.nseindia.com/api/historical/cm/equity?symbol={raw_symbol}&series=EQ&from={start_date}&to={end_date}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers)
+
+    if resp.status_code != 200:
+        return None
+
+    data = resp.json().get("data", [])
+    if not data:
+        return None
+
+    df = pd.DataFrame(data)
+    df["trade_date"] = pd.to_datetime(df["CH_TIMESTAMP"]).dt.strftime("%Y-%m-%d")
+
+    payload = pd.DataFrame({
+        "trade_date": df["trade_date"],
+        "open": pd.to_numeric(df["CH_OPENING_PRICE"], errors="coerce"),
+        "high": pd.to_numeric(df["CH_TRADE_HIGH_PRICE"], errors="coerce"),
+        "low": pd.to_numeric(df["CH_TRADE_LOW_PRICE"], errors="coerce"),
+        "close": pd.to_numeric(df["CH_CLOSING_PRICE"], errors="coerce"),
+        "volume": pd.to_numeric(df["CH_TOT_TRADED_QTY"], errors="coerce"),
+    })
+    return payload.dropna(subset=["trade_date","close"])
+
+
+
 def fetch_ohlc_normalized(ticker: str, days: int = 90):
     df = yf.download(
         ticker,
@@ -105,7 +139,7 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
 # -------------------------------
 # Supabase Loader
 # -------------------------------
-def load_ohlc_to_supabase(tickers, days=90):
+def load_ohlc_to_supabase(tickers, days=180):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
@@ -116,26 +150,25 @@ def load_ohlc_to_supabase(tickers, days=90):
     total = len(tickers)
 
     for i, t in enumerate(tickers, start=1):
+        # Sheet gives "NSE:TICKER"
         symbol = t.strip().upper()
         if symbol.startswith("NSE:"):
-            symbol = symbol.split("NSE:")[1] + ".NS"
+            raw_symbol = symbol.split("NSE:")[1]   # e.g. "ADANIENT"
         else:
-            symbol = symbol + ".NS"
+            raw_symbol = symbol
 
         status.text(f"Processing {symbol} ({i}/{total})…")
         try:
-            payload = fetch_ohlc_normalized(symbol, days=days)
+            payload = fetch_ohlc_normalized_nse(raw_symbol, days=days)
             if payload is None or payload.empty:
                 st.warning(f"No OHLC data for {symbol}")
                 fail_count += 1
                 continue
 
-            rows = payload.to_dict(orient="records")
-            if not rows:
-                st.warning(f"No valid rows after normalization for {symbol}")
-                fail_count += 1
-                continue
+            # ✅ Store ticker in Supabase as "NSE:TICKER"
+            payload["ticker"] = symbol
 
+            rows = payload.to_dict(orient="records")
             resp = supabase.table("ohlc_data").upsert(rows).execute()
             st.write(f"{symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
             success_count += 1
@@ -149,6 +182,7 @@ def load_ohlc_to_supabase(tickers, days=90):
     status.empty()
     progress.empty()
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
+
 
 
 # -------------------------------
