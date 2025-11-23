@@ -29,12 +29,13 @@ def load_ohlc_to_supabase(tickers, days=90):
                 continue
 
             data = data.reset_index()
+            data["trade_date"] = pd.to_datetime(data["Date"]).dt.strftime("%Y-%m-%d")
+
             rows = []
             for _, row in data.iterrows():
                 rows.append({
                     "ticker": ticker + ".NS",
-                    # ✅ FIXED: convert Timestamp to string date
-                    "trade_date": pd.to_datetime(row["Date"]).strftime("%Y-%m-%d"),
+                    "trade_date": row["trade_date"],   # ✅ now a clean string
                     "open": float(row["Open"]) if not pd.isna(row["Open"]) else None,
                     "high": float(row["High"]) if not pd.isna(row["High"]) else None,
                     "low": float(row["Low"]) if not pd.isna(row["Low"]) else None,
