@@ -161,139 +161,147 @@ class GARPAnalyzer:
 
 
 class Nifty200RSIAnalyzer:
-    def __init__(self, supabase_client=None, **kwargs):
+    def __init__(self, supabase_client=None, sell_threshold_pct=12, **kwargs):
         self.supabase = supabase_client
+        self.sell_threshold_pct = sell_threshold_pct
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
-        self.active_signals = {}
+        self.active_signals = {}  # track active BUY signals per ticker
+
+    def _ensure_supabase(self):
+        if self.supabase is None:
+            import streamlit as st
+            url = st.secrets["supabase"]["url"]
+            key = st.secrets["supabase"]["key"]
+            self.supabase = create_client(url, key)
+
+    def _detect_ticker_column(self, df: pd.DataFrame) -> str:
+        """Detect ticker column in buy_df without renaming globally."""
+        for c in ["Ticker", "ticker", "Symbol", "symbol", "Instrument", "instrument"]:
+            if c in df.columns:
+                return c
+        # fallback heuristic
+        for c in df.columns:
+            if str(c).lower().startswith("tick") or str(c).lower().startswith("symb"):
+                return c
+        raise KeyError("No ticker column found in buy_df")
+
+    def _fetch_ohlc_for_tickers(self, tickers: list, days: int = 90) -> pd.DataFrame:
+        """Fetch last N days OHLC from Supabase for given tickers."""
+        self._ensure_supabase()
+        from datetime import datetime, timedelta
+        cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
+
+        frames = []
+        CHUNK = 100
+        for i in range(0, len(tickers), CHUNK):
+            batch = tickers[i:i+CHUNK]
+            resp = (
+                self.supabase.table("ohlc_data")
+                .select("*")
+                .in_("ticker", batch)
+                .gte("trade_date", cutoff)
+                .execute()
+            )
+            data = getattr(resp, "data", [])
+            if data:
+                frames.append(pd.DataFrame(data))
+
+        if not frames:
+            return pd.DataFrame(columns=["ticker","trade_date","open","high","low","close","volume"])
+
+        df = pd.concat(frames, ignore_index=True)
+        df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
+        for c in ["open","high","low","close","volume"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        return df
 
     def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
-        # Guard: empty or too short series
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
         delta = series.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
-        avg_gain = gain.rolling(period).mean()
-        avg_loss = loss.rolling(period).mean()
+        avg_gain = gain.rolling(period, min_periods=period).mean()
+        avg_loss = loss.rolling(period, min_periods=period).mean()
         rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
+        return 100 - (100 / (1 + rs))
 
-    def analyze_buy(self, df: pd.DataFrame):
+    def analyze_buy(self, buy_df: pd.DataFrame):
+        if buy_df is None or buy_df.empty:
+            self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","Status","Last date"])
+            return
+
+        ticker_col = self._detect_ticker_column(buy_df)
+        raw_tickers = (
+            buy_df[ticker_col].astype(str).str.strip().dropna().unique().tolist()
+        )
+
+        normalized = []
+        for t in raw_tickers:
+            tt = t.upper()
+            if tt.startswith("NSE:"):
+                tt = tt.split("NSE:")[1] + ".NS"
+            elif not tt.endswith(".NS"):
+                tt = tt + ".NS"
+            normalized.append(tt)
+
+        ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
+        if ohlc.empty:
+            self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","Status","Last date"])
+            return
+
         results = []
-
-        # 1) Normalize column names to lowercase
-        df = df.copy()
-        df.columns = [str(c).strip().lower() for c in df.columns]
-
-        # 2) Ensure we have a ticker column
-        # Accept 'ticker' or 'symbol' or 'instrument'
-        ticker_col = None
-        for c in ["ticker", "symbol", "instrument"]:
-            if c in df.columns:
-                ticker_col = c
-                break
-        if ticker_col is None:
-            # Try to detect a likely ticker column
-            possible = [c for c in df.columns if c.startswith("tick") or c.startswith("symb")]
-            if possible:
-                ticker_col = possible[0]
-            else:
-                # hard fail with a clear message
-                raise KeyError("No ticker column found. Expected one of: ticker/symbol/instrument.")
-
-        # 3) Ensure trade_date exists, derive from common candidates
-        date_col = None
-        for c in ["trade_date", "date", "datetime", "timestamp"]:
-            if c in df.columns:
-                date_col = c
-                break
-        if date_col is None:
-            # If first column looks like a date, use it
-            first = df.columns[0]
-            if pd.api.types.is_datetime64_any_dtype(df[first]) or "date" in first or "time" in first:
-                date_col = first
-            else:
-                raise KeyError("No date column found. Expected one of: trade_date/date/datetime/timestamp.")
-
-        # Create canonical trade_date string (YYYY-MM-DD)
-        df["trade_date"] = pd.to_datetime(df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
-
-        # 4) Ensure close exists (for RSI)
-        close_col = None
-        for c in ["close", "adjclose", "adj_close"]:
-            if c in df.columns:
-                close_col = c
-                break
-        if close_col is None:
-            # Try flattened multiindex names like 'acc.ns_close'
-            candidates = [c for c in df.columns if c.endswith("_close") or c.startswith("close_")]
-            if candidates:
-                close_col = candidates[0]
-            else:
-                raise KeyError("No close column found. Expected one of: close/adjclose/adj_close or *_close.")
-
-        # 5) Compute per-ticker signals
-        for ticker in df[ticker_col].dropna().unique():
+        for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = (
-                df[df[ticker_col] == ticker]
-                .dropna(subset=["trade_date"])
+                ohlc[ohlc["ticker"] == ticker]
+                .dropna(subset=["trade_date","close"])
                 .sort_values("trade_date")
             )
-
-            # Guard: missing or non-numeric close
-            sub[close_col] = pd.to_numeric(sub[close_col], errors="coerce")
-            if sub[close_col].isna().all():
+            if sub.empty:
+                results.append({"Ticker":ticker,"RSI":None,"Signal":"","Status":"Inactive","Last date":None})
                 continue
 
-            sub["rsi"] = self.compute_rsi(sub[close_col])
-
-            # Lookback window: last 30 trading rows
+            sub["rsi"] = self.compute_rsi(sub["close"])
             recent = sub.tail(30)
             if recent.empty or recent["rsi"].isna().all():
-                # Not enough data to compute RSI
                 results.append({
-                    "Ticker": ticker,
-                    "RSI": None,
-                    "Signal": "",
-                    "Status": "Inactive",
-                    "Last date": sub["trade_date"].iloc[-1] if not sub.empty else None
+                    "Ticker":ticker,"RSI":None,"Signal":"","Status":"Inactive",
+                    "Last date":sub["trade_date"].iloc[-1].date().isoformat()
                 })
                 continue
 
             latest_rsi = recent["rsi"].iloc[-1]
             dipped_35 = (recent["rsi"] <= 35).any()
-            crossed_40_now = latest_rsi is not None and latest_rsi >= 40
-            crossed_50_now = latest_rsi is not None and latest_rsi >= 50
+            crossed_40 = pd.notna(latest_rsi) and latest_rsi >= 40
+            crossed_50 = pd.notna(latest_rsi) and latest_rsi >= 50
 
-            # Determine current status
             status = "Active" if self.active_signals.get(ticker, False) else "Inactive"
 
-            # Clear signal if crossing 50
-            if crossed_50_now:
+            if crossed_50:
                 self.active_signals[ticker] = False
                 status = "Inactive"
 
-            # Trigger buy only if dipped ≤35 within window and now crosses ≥40, and not cleared by ≥50
-            if dipped_35 and crossed_40_now and not crossed_50_now:
+            if dipped_35 and crossed_40 and not crossed_50:
                 if not self.active_signals.get(ticker, False):
                     self.active_signals[ticker] = True
                     status = "Active"
 
-            # Add summary row
             results.append({
-                "Ticker": ticker,
-                "RSI": round(latest_rsi, 2) if latest_rsi is not None else None,
-                "Signal": "BUY" if self.active_signals.get(ticker, False) else "",
-                "Status": "Active" if self.active_signals.get(ticker, False) else "Inactive",
-                "Last date": recent["trade_date"].iloc[-1] if not recent.empty else None
+                "Ticker":ticker,
+                "RSI":round(latest_rsi,2) if pd.notna(latest_rsi) else None,
+                "Signal":"BUY" if self.active_signals.get(ticker, False) else "",
+                "Status":"Active" if self.active_signals.get(ticker, False) else "Inactive",
+                "Last date":recent["trade_date"].iloc[-1].date().isoformat()
             })
 
         self.analysis_df = pd.DataFrame(results)
         self.signal_log.extend(results)
 
+    def analyze_sell(self, portfolio_df: pd.DataFrame):
+        # Keep separate; implement if needed
+        pass
+
     def get_sheet_summary(self) -> pd.DataFrame:
         return self.analysis_df
-
 
