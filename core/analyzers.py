@@ -165,10 +165,12 @@ class Nifty200RSIAnalyzer:
         self.supabase = supabase_client
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
-        # Track active signals per ticker
         self.active_signals = {}
 
-    def compute_rsi(self, series, period=14):
+    def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
+        # Guard: empty or too short series
+        if series is None or series.empty or series.shape[0] < period + 1:
+            return pd.Series([None] * series.shape[0], index=series.index)
         delta = series.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
@@ -178,54 +180,120 @@ class Nifty200RSIAnalyzer:
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def analyze_buy(self, df):
+    def analyze_buy(self, df: pd.DataFrame):
         results = []
-        # Normalize column names to lowercase
-        df.columns = [c.lower() for c in df.columns]
-        for ticker in df["ticker"].unique():
-            sub = df[df["ticker"] == ticker].sort_values("trade_date")
-            sub["RSI"] = self.compute_rsi(sub["close"])
 
-            # Lookback window: last 30 trading days
+        # 1) Normalize column names to lowercase
+        df = df.copy()
+        df.columns = [str(c).strip().lower() for c in df.columns]
+
+        # 2) Ensure we have a ticker column
+        # Accept 'ticker' or 'symbol' or 'instrument'
+        ticker_col = None
+        for c in ["ticker", "symbol", "instrument"]:
+            if c in df.columns:
+                ticker_col = c
+                break
+        if ticker_col is None:
+            # Try to detect a likely ticker column
+            possible = [c for c in df.columns if c.startswith("tick") or c.startswith("symb")]
+            if possible:
+                ticker_col = possible[0]
+            else:
+                # hard fail with a clear message
+                raise KeyError("No ticker column found. Expected one of: ticker/symbol/instrument.")
+
+        # 3) Ensure trade_date exists, derive from common candidates
+        date_col = None
+        for c in ["trade_date", "date", "datetime", "timestamp"]:
+            if c in df.columns:
+                date_col = c
+                break
+        if date_col is None:
+            # If first column looks like a date, use it
+            first = df.columns[0]
+            if pd.api.types.is_datetime64_any_dtype(df[first]) or "date" in first or "time" in first:
+                date_col = first
+            else:
+                raise KeyError("No date column found. Expected one of: trade_date/date/datetime/timestamp.")
+
+        # Create canonical trade_date string (YYYY-MM-DD)
+        df["trade_date"] = pd.to_datetime(df[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+
+        # 4) Ensure close exists (for RSI)
+        close_col = None
+        for c in ["close", "adjclose", "adj_close"]:
+            if c in df.columns:
+                close_col = c
+                break
+        if close_col is None:
+            # Try flattened multiindex names like 'acc.ns_close'
+            candidates = [c for c in df.columns if c.endswith("_close") or c.startswith("close_")]
+            if candidates:
+                close_col = candidates[0]
+            else:
+                raise KeyError("No close column found. Expected one of: close/adjclose/adj_close or *_close.")
+
+        # 5) Compute per-ticker signals
+        for ticker in df[ticker_col].dropna().unique():
+            sub = (
+                df[df[ticker_col] == ticker]
+                .dropna(subset=["trade_date"])
+                .sort_values("trade_date")
+            )
+
+            # Guard: missing or non-numeric close
+            sub[close_col] = pd.to_numeric(sub[close_col], errors="coerce")
+            if sub[close_col].isna().all():
+                continue
+
+            sub["rsi"] = self.compute_rsi(sub[close_col])
+
+            # Lookback window: last 30 trading rows
             recent = sub.tail(30)
-            latest_rsi = recent["RSI"].iloc[-1]
+            if recent.empty or recent["rsi"].isna().all():
+                # Not enough data to compute RSI
+                results.append({
+                    "Ticker": ticker,
+                    "RSI": None,
+                    "Signal": "",
+                    "Status": "Inactive",
+                    "Last date": sub["trade_date"].iloc[-1] if not sub.empty else None
+                })
+                continue
 
-            dipped = (recent["RSI"] <= 35).any()
-            crossed_40 = latest_rsi >= 40
-            crossed_50 = latest_rsi >= 50
+            latest_rsi = recent["rsi"].iloc[-1]
+            dipped_35 = (recent["rsi"] <= 35).any()
+            crossed_40_now = latest_rsi is not None and latest_rsi >= 40
+            crossed_50_now = latest_rsi is not None and latest_rsi >= 50
 
-            status = "Inactive"
+            # Determine current status
+            status = "Active" if self.active_signals.get(ticker, False) else "Inactive"
 
-            # Strategy logic
-            if dipped and crossed_40 and not crossed_50:
-                if not self.active_signals.get(ticker, False):
-                    self.active_signals[ticker] = True
-                    status = "Active"
-                    results.append({
-                        "Ticker": ticker,
-                        "RSI": round(latest_rsi, 2),
-                        "Signal": "BUY",
-                        "Status": status
-                    })
-                else:
-                    status = "Active"
-
-            if crossed_50:
-                # Clear signal
+            # Clear signal if crossing 50
+            if crossed_50_now:
                 self.active_signals[ticker] = False
                 status = "Inactive"
 
-            # Always include ticker in summary
+            # Trigger buy only if dipped ≤35 within window and now crosses ≥40, and not cleared by ≥50
+            if dipped_35 and crossed_40_now and not crossed_50_now:
+                if not self.active_signals.get(ticker, False):
+                    self.active_signals[ticker] = True
+                    status = "Active"
+
+            # Add summary row
             results.append({
                 "Ticker": ticker,
-                "RSI": round(latest_rsi, 2),
+                "RSI": round(latest_rsi, 2) if latest_rsi is not None else None,
                 "Signal": "BUY" if self.active_signals.get(ticker, False) else "",
-                "Status": "Active" if self.active_signals.get(ticker, False) else "Inactive"
+                "Status": "Active" if self.active_signals.get(ticker, False) else "Inactive",
+                "Last date": recent["trade_date"].iloc[-1] if not recent.empty else None
             })
 
         self.analysis_df = pd.DataFrame(results)
         self.signal_log.extend(results)
 
-    def get_sheet_summary(self):
+    def get_sheet_summary(self) -> pd.DataFrame:
         return self.analysis_df
+
 

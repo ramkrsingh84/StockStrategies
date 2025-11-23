@@ -185,11 +185,14 @@ if st.button("▶️ Run Strategy"):
     summary_df = runner.analyzer.get_sheet_summary()
 
     if not summary_df.empty:
-        st.subheader("📋 Nifty200 RSI Buy Table")
+        st.subheader("📋 Nifty200 RSI Summary")
+        # Ensure numeric formatting for RSI
         summary_df["RSI"] = pd.to_numeric(summary_df["RSI"], errors="coerce")
 
         st.dataframe(
-            summary_df.style.format({"RSI": "{:.2f}"}),
+            summary_df[["Ticker", "RSI", "Signal", "Status", "Last date"]]
+                .sort_values(["Status", "Ticker"], ascending=[False, True])
+                .style.format({"RSI": "{:.2f}"}),
             width="stretch"
         )
 
