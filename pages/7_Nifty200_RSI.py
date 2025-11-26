@@ -136,8 +136,25 @@ def load_ohlc_to_supabase(tickers, days=90):
                 fail_count += 1
                 continue
 
-            resp = supabase.table("ohlc_data").upsert(rows).execute()
-            st.write(f"{symbol} → inserted {len(rows)} rows; error:", getattr(resp, "error", None))
+            # 1. Get existing trade_date values for this ticker
+            existing = (
+                supabase.table("ohlc_data")
+                .select("trade_date")
+                .eq("ticker", symbol)
+                .execute()
+            )
+
+            existing_dates = {row["trade_date"] for row in getattr(existing, "data", [])}
+
+            # 2. Filter out rows that already exist
+            new_rows = [r for r in rows if r["trade_date"] not in existing_dates]
+
+            # 3. Insert only new rows
+            if new_rows:
+                resp = supabase.table("ohlc_data").insert(new_rows).execute()
+                st.write(f"{symbol} → inserted {len(new_rows)} new rows; error:", getattr(resp, "error", None))
+            else:
+                st.write(f"{symbol} → no new rows to insert")
             success_count += 1
 
         except Exception as e:
