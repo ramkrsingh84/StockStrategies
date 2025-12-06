@@ -274,7 +274,8 @@ if st.button("▶️ Run Strategy"):
             elif not symbol.endswith(".NS"):
                 symbol = symbol + ".NS"
 
-            pegs.append(fetch_peg_ratio(symbol))
+            analyzer = runner.analyzer
+            pegs.append(analyzer.fetch_peg_ratio(symbol))
 
         summary_df["PEG"] = pegs
         
