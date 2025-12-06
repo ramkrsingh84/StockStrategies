@@ -233,7 +233,7 @@ class Nifty200RSIAnalyzer:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         return df
 
-    def compute_rsi_wilder(series: pd.Series, period: int = 14) -> pd.Series:
+    def compute_rsi_wilder(self, series: pd.Series, period: int = 14) -> pd.Series:
         """Compute RSI using Wilder's smoothing method."""
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
@@ -262,7 +262,7 @@ class Nifty200RSIAnalyzer:
         return pd.Series(rsi_values, index=series.index)
 
 
-    def identify_buy_signals(df: pd.DataFrame) -> list:
+    def identify_buy_signals(self, df: pd.DataFrame) -> list:
         """Identify BUY signals based on RSI cycle rules."""
         buy_points = []
         dipped = False
@@ -284,7 +284,7 @@ class Nifty200RSIAnalyzer:
     # -------------------------------
     # PEG Ratio Functions
     # -------------------------------
-    def fetch_peg_ratio(ticker: str):
+    def fetch_peg_ratio(self, ticker: str):
         """
         Fetch PEG ratio using yFinance.
         PEG = PE / Earnings Growth
@@ -304,7 +304,7 @@ class Nifty200RSIAnalyzer:
             return None
 
 
-    def highlight_peg(val):
+    def highlight_peg(self, val):
         """Style function for DataFrame: green if PEG < 1.5."""
         try:
             if val is not None and float(val) < 1.5:
