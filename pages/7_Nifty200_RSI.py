@@ -278,17 +278,14 @@ if st.button("▶️ Run Strategy"):
             pegs.append(analyzer.fetch_peg_ratio(symbol))
 
         summary_df["PEG"] = pegs
-        
-        # Conditional formatting: green if PEG < 1.5
-        def highlight_peg(val):
-            try:
-                if val is not None and float(val) < 1.5:
-                    return "color: green"
-            except:
-                pass
-            return ""
 
-        st.dataframe(runner.analyzer.get_sheet_summary(), width="stretch")
+        st.dataframe(
+            summary_df[["Ticker", "RSI", "PEG", "Signal", "Status", "Last date"]]
+                .sort_values(["Status", "Ticker"], ascending=[False, True])
+                .style.format({"RSI": "{:.2f}", "PEG": "{:.2f}"})
+                .applymap(runner.analyzer.highlight_peg, subset=["PEG"]),
+            width="stretch"
+        )
 
 if st.button("🧹 Prune OHLC Data"):
     prune_ohlc_data()
