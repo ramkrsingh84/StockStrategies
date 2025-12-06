@@ -353,7 +353,7 @@ if st.button("▶️ Run Strategy"):
             summary_df[["Ticker", "RSI", "PEG", "Signal", "Status", "Last date"]]
                 .sort_values(["Status", "Ticker"], ascending=[False, True])
                 .style.format({"RSI": "{:.2f}", "PEG": "{:.2f}"})
-                .applymap(highlight_peg, subset=["PEG"]),,
+                .applymap(highlight_peg, subset=["PEG"]),
             width="stretch"
         )
 
