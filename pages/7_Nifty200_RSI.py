@@ -9,6 +9,7 @@ from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from core.analyzers import filter_trading_days
+from core.analyzers import filter_trading_days, compute_rsi_wilder, identify_buy_signals
 
 
 # 🔒 Auth check
@@ -191,34 +192,6 @@ def load_ohlc_to_supabase(tickers, days=180):
     st.success(f"✅ Completed OHLC load. Success: {success_count}, Failed: {fail_count}, Total: {total}")
 
 
-# -------------------------------
-# Chart with RSI & Signals
-# -------------------------------
-def compute_rsi_wilder(series: pd.Series, period=14) -> pd.Series:
-    """Compute RSI using Wilder's smoothing (matches Upstox)."""
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-
-    avg_gain = gain.iloc[1:period+1].mean()
-    avg_loss = loss.iloc[1:period+1].mean()
-
-    rsi_values = [None] * len(series)
-
-    for i in range(period+1, len(series)):
-        avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
-        avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
-
-        if avg_loss == 0:
-            rsi = 100
-        else:
-            rs = avg_gain / avg_loss
-            rsi = 100 - (100 / (1 + rs))
-
-        rsi_values[i] = rsi
-
-    return pd.Series(rsi_values, index=series.index)
-
 
 def plot_ticker_chart(ticker: str, days: int = 180):
     url = st.secrets["supabase"]["url"]
@@ -250,19 +223,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df["rsi"] = compute_rsi_wilder(df["close"], period=14)
 
     # --- Identify BUY signals ---
-    buy_points = []
-    dipped = False
-    for i in range(1, len(df)):
-        rsi_prev, rsi_now = df["rsi"].iloc[i-1], df["rsi"].iloc[i]
-        if pd.isna(rsi_prev) or pd.isna(rsi_now):
-            continue
-
-        if rsi_now <= 35:
-            dipped = True
-        if rsi_now >= 55:
-            dipped = False
-        if dipped and rsi_prev < 40 and rsi_now >= 40:
-            buy_points.append((df["trade_date"].iloc[i], rsi_now))
+    buy_points = identify_buy_signals(df)
 
     fig = go.Figure()
 

@@ -233,10 +233,8 @@ class Nifty200RSIAnalyzer:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         return df
 
-    def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
-        """
-        Compute RSI using Wilder's smoothing method (matches Upstox/TradingView).
-        """
+    def compute_rsi_wilder(series: pd.Series, period: int = 14) -> pd.Series:
+        """Compute RSI using Wilder's smoothing method."""
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
 
@@ -244,13 +242,11 @@ class Nifty200RSIAnalyzer:
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
 
-        # First average gain/loss = simple average of first N periods
         avg_gain = gain.iloc[1:period+1].mean()
         avg_loss = loss.iloc[1:period+1].mean()
 
         rsi_values = [None] * len(series)
 
-        # Wilder smoothing thereafter
         for i in range(period+1, len(series)):
             avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
             avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
@@ -264,6 +260,26 @@ class Nifty200RSIAnalyzer:
             rsi_values[i] = rsi
 
         return pd.Series(rsi_values, index=series.index)
+
+
+    def identify_buy_signals(df: pd.DataFrame) -> list:
+        """Identify BUY signals based on RSI cycle rules."""
+        buy_points = []
+        dipped = False
+
+        for i in range(1, len(df)):
+            rsi_prev, rsi_now = df["rsi"].iloc[i-1], df["rsi"].iloc[i]
+            if pd.isna(rsi_prev) or pd.isna(rsi_now):
+                continue
+
+            if rsi_now <= 35:
+                dipped = True
+            if rsi_now >= 55:
+                dipped = False
+            if dipped and rsi_prev < 40 and rsi_now >= 40:
+                buy_points.append((df["trade_date"].iloc[i], rsi_now))
+
+        return buy_points
 
     def analyze_buy(self, buy_df: pd.DataFrame):
         if buy_df is None or buy_df.empty:
