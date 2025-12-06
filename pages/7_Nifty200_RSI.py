@@ -20,6 +20,29 @@ st.set_page_config(page_title="Nifty200 RSI Strategy", layout="wide")
 st.title("📈 Nifty200 RSI Strategy Analysis")
 
 # -------------------------------
+# PEG calculation
+# -------------------------------
+
+def fetch_peg_ratio(ticker: str):
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        pe = info.get("trailingPE")
+        growth = info.get("earningsGrowth")
+
+        if pe is None or growth is None or growth == 0:
+            return None
+
+        peg = pe / growth
+        return round(peg, 2)
+    except Exception as e:
+        st.warning(f"PEG ratio not available for {ticker}: {e}")
+        return None
+
+
+
+
+# -------------------------------
 # OHLC Pruning
 # -------------------------------
 def prune_ohlc_data():
@@ -54,7 +77,7 @@ def prune_ohlc_data():
 # -------------------------------
 # OHLC Fetch + Normalize
 # -------------------------------
-def fetch_ohlc_normalized(ticker: str, days: int = 90):
+def fetch_ohlc_normalized(ticker: str, days: int = 180):
     df = yf.download(
         ticker,
         period=f"{days}d",
@@ -105,7 +128,7 @@ def fetch_ohlc_normalized(ticker: str, days: int = 90):
 # -------------------------------
 # Supabase Loader
 # -------------------------------
-def load_ohlc_to_supabase(tickers, days=90):
+def load_ohlc_to_supabase(tickers, days=180):
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
@@ -292,7 +315,7 @@ if st.button("📥 Load OHLC Data"):
         st.stop()
 
     tickers = tickers_df["Ticker"].dropna().tolist()
-    load_ohlc_to_supabase(tickers, days=90)
+    load_ohlc_to_supabase(tickers, days=180)
 
 if st.button("▶️ Run Strategy"):
     runner = StrategyRunner("Nifty200_RSI", STRATEGY_CONFIG["Nifty200_RSI"])
@@ -302,11 +325,35 @@ if st.button("▶️ Run Strategy"):
     if not summary_df.empty:
         st.subheader("📋 Nifty200 RSI Summary")
         summary_df["RSI"] = pd.to_numeric(summary_df["RSI"], errors="coerce")
+        
+        # Add PEG ratio column
+        pegs = []
+        for t in summary_df["Ticker"]:
+            # Normalize ticker to Yahoo format
+            symbol = t.strip().upper()
+            if symbol.startswith("NSE:"):
+                symbol = symbol.split("NSE:")[1] + ".NS"
+            elif not symbol.endswith(".NS"):
+                symbol = symbol + ".NS"
+
+            pegs.append(fetch_peg_ratio(symbol))
+
+        summary_df["PEG"] = pegs
+        
+        # Conditional formatting: green if PEG < 1.5
+        def highlight_peg(val):
+            try:
+                if val is not None and float(val) < 1.5:
+                    return "color: green"
+            except:
+                pass
+            return ""
 
         st.dataframe(
-            summary_df[["Ticker", "RSI", "Signal", "Status", "Last date"]]
+            summary_df[["Ticker", "RSI", "PEG", "Signal", "Status", "Last date"]]
                 .sort_values(["Status", "Ticker"], ascending=[False, True])
-                .style.format({"RSI": "{:.2f}"}),
+                .style.format({"RSI": "{:.2f}"}, "PEG": "{:.2f}"})
+                .applymap(highlight_peg, subset=["PEG"]),,
             width="stretch"
         )
 
