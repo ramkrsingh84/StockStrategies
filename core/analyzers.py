@@ -390,5 +390,14 @@ class Nifty200RSIAnalyzer:
         pass
 
     def get_sheet_summary(self) -> pd.DataFrame:
-        return self.analysis_df
+        if self.analysis_df.empty:
+            return pd.DataFrame(columns=["Ticker","RSI","PEG","Signal","Status","Last date"])
+        # Apply formatting and highlight PEG < 1.5
+        return (
+            self.analysis_df
+            .copy()
+            .sort_values(["Status","Ticker"], ascending=[False,True])
+            .style.format({"RSI": "{:.2f}", "PEG": "{:.2f}"})
+            .applymap(self.highlight_peg, subset=["PEG"])
+        )
 
