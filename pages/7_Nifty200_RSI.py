@@ -20,26 +20,6 @@ if "authentication_status" not in st.session_state or not st.session_state["auth
 st.set_page_config(page_title="Nifty200 RSI Strategy", layout="wide")
 st.title("📈 Nifty200 RSI Strategy Analysis")
 
-# -------------------------------
-# PEG calculation
-# -------------------------------
-
-def fetch_peg_ratio(ticker: str):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        pe = info.get("trailingPE")
-        growth = info.get("earningsGrowth")
-
-        if pe is None or growth is None or growth == 0:
-            return None
-
-        peg = pe / growth
-        return round(peg, 2)
-    except Exception as e:
-        st.warning(f"PEG ratio not available for {ticker}: {e}")
-        return None
-
 
 # -------------------------------
 # OHLC Pruning
@@ -221,7 +201,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df["rsi"] = Nifty200RSIAnalyzer.compute_rsi_wilder(df["close"], period=14)
 
     # --- Identify BUY signals ---
-    buy_points = identify_buy_signals(df)
+    buy_points = Nifty200RSIAnalyzer.identify_buy_signals(df)
 
     fig = go.Figure()
 
