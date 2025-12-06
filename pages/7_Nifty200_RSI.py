@@ -8,8 +8,8 @@ from core.runner import StrategyRunner
 from config import STRATEGY_CONFIG
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
-from core.analyzers import filter_trading_days
-from core.analyzers import filter_trading_days, compute_rsi_wilder, identify_buy_signals
+from core.analyzers import filter_trading_days, Nifty200RSIAnalyzer
+
 
 
 # 🔒 Auth check
@@ -39,8 +39,6 @@ def fetch_peg_ratio(ticker: str):
     except Exception as e:
         st.warning(f"PEG ratio not available for {ticker}: {e}")
         return None
-
-
 
 
 # -------------------------------
@@ -220,7 +218,7 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     df = filter_trading_days(df)
 
     # Compute Wilder RSI
-    df["rsi"] = compute_rsi_wilder(df["close"], period=14)
+    df["rsi"] = Nifty200RSIAnalyzer.compute_rsi_wilder(df["close"], period=14)
 
     # --- Identify BUY signals ---
     buy_points = identify_buy_signals(df)

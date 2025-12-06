@@ -280,6 +280,38 @@ class Nifty200RSIAnalyzer:
                 buy_points.append((df["trade_date"].iloc[i], rsi_now))
 
         return buy_points
+        
+    # -------------------------------
+    # PEG Ratio Functions
+    # -------------------------------
+    def fetch_peg_ratio(ticker: str):
+        """
+        Fetch PEG ratio using yFinance.
+        PEG = PE / Earnings Growth
+        Returns None if data unavailable.
+        """
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            pe = info.get("trailingPE")
+            growth = info.get("earningsGrowth")
+
+            if pe is None or growth is None or growth == 0:
+                return None
+
+            return round(pe / growth, 2)
+        except Exception:
+            return None
+
+
+    def highlight_peg(val):
+        """Style function for DataFrame: green if PEG < 1.5."""
+        try:
+            if val is not None and float(val) < 1.5:
+                return "color: green"
+        except:
+            pass
+        return ""
 
     def analyze_buy(self, buy_df: pd.DataFrame):
         if buy_df is None or buy_df.empty:
