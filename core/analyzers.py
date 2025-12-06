@@ -315,7 +315,7 @@ class Nifty200RSIAnalyzer:
 
     def analyze_buy(self, buy_df: pd.DataFrame):
         if buy_df is None or buy_df.empty:
-            self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","Status","Last date"])
+            self.analysis_df = pd.DataFrame(columns=["Ticker","RSI","Signal","PEG","Status","Last date"])
             return
 
         ticker_col = self._detect_ticker_column(buy_df)
@@ -371,9 +371,13 @@ class Nifty200RSIAnalyzer:
                         self.active_signals[ticker] = True
                         status = "Active"
 
+            # ✅ Append PEG here
+            peg_val = self.fetch_peg_ratio(ticker)
+            
             results.append({
                 "Ticker": ticker,
                 "RSI": round(latest_rsi, 2) if pd.notna(latest_rsi) else None,
+                "PEG": peg_val,
                 "Signal": "BUY" if self.active_signals.get(ticker, False) else "",
                 "Status": status,
                 "Last date": recent["trade_date"].iloc[-1].date().isoformat()
