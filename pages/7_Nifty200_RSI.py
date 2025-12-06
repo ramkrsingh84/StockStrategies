@@ -197,11 +197,10 @@ def plot_ticker_chart(ticker: str, days: int = 180):
     # 🔎 Filter trading days
     df = filter_trading_days(df)
 
-    # Compute Wilder RSI
-    df["rsi"] = Nifty200RSIAnalyzer.compute_rsi_wilder(df["close"], period=14)
+    analyzer = Nifty200RSIAnalyzer()
+    df["rsi"] = analyzer.compute_rsi_wilder(df["close"], period=14)
+    buy_points = analyzer.identify_buy_signals(df)
 
-    # --- Identify BUY signals ---
-    buy_points = Nifty200RSIAnalyzer.identify_buy_signals(df)
 
     fig = go.Figure()
 

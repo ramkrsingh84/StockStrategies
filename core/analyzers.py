@@ -11,6 +11,28 @@ import os
 import json
 
 
+# 🔎 Load holiday JSON once at module level
+HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
+try:
+    with open(HOLIDAY_FILE, "r") as f:
+        NSE_HOLIDAYS = json.load(f)
+except FileNotFoundError:
+    NSE_HOLIDAYS = {}  # fallback if file missing
+
+def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop weekends and NSE holidays automatically."""
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    # Drop weekends
+    df = df[df["trade_date"].dt.dayofweek < 5]
+    # Drop NSE holidays
+    years = df["trade_date"].dt.year.unique()
+    all_holidays = []
+    for y in years:
+        all_holidays.extend(NSE_HOLIDAYS.get(str(y), []))
+    if all_holidays:
+        holidays = pd.to_datetime(all_holidays)
+        df = df[~df["trade_date"].isin(holidays)]
+    return df
 
 class SignalAnalyzer:
     def __init__(self, sell_threshold_pct=12):
@@ -162,28 +184,6 @@ class GARPAnalyzer:
 
         return df[["Ticker", "Price", "Final Rank"]].copy()
 
-# 🔎 Load holiday JSON once at module level
-HOLIDAY_FILE = os.path.join(os.path.dirname(__file__), "..", "pages", "nse_holidays.json")
-try:
-    with open(HOLIDAY_FILE, "r") as f:
-        NSE_HOLIDAYS = json.load(f)
-except FileNotFoundError:
-    NSE_HOLIDAYS = {}  # fallback if file missing
-
-def filter_trading_days(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop weekends and NSE holidays automatically."""
-    df["trade_date"] = pd.to_datetime(df["trade_date"])
-    # Drop weekends
-    df = df[df["trade_date"].dt.dayofweek < 5]
-    # Drop NSE holidays
-    years = df["trade_date"].dt.year.unique()
-    all_holidays = []
-    for y in years:
-        all_holidays.extend(NSE_HOLIDAYS.get(str(y), []))
-    if all_holidays:
-        holidays = pd.to_datetime(all_holidays)
-        df = df[~df["trade_date"].isin(holidays)]
-    return df
 
 
 class Nifty200RSIAnalyzer:
@@ -342,6 +342,8 @@ class Nifty200RSIAnalyzer:
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = ohlc[ohlc["ticker"] == ticker].dropna(subset=["trade_date","close"]).sort_values("trade_date")
             sub["rsi"] = self.compute_rsi_wilder(sub["close"], period=14)
+            buy_points = self.identify_buy_signals(sub)
+
             recent = sub.tail(30)
 
             if recent.empty or recent["rsi"].isna().all():
