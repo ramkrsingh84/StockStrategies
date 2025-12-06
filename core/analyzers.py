@@ -341,7 +341,7 @@ class Nifty200RSIAnalyzer:
         results = []
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = ohlc[ohlc["ticker"] == ticker].dropna(subset=["trade_date","close"]).sort_values("trade_date")
-            sub["rsi"] = self.compute_rsi(sub["close"], period=14)
+            sub["rsi"] = self.compute_rsi_wilder(sub["close"], period=14)
             recent = sub.tail(30)
 
             if recent.empty or recent["rsi"].isna().all():
