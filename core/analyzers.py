@@ -395,4 +395,92 @@ class Nifty200RSIAnalyzer:
         # Apply formatting and highlight PEG < 1.5
         return self.analysis_df.copy().sort_values(["Status","Ticker"], ascending=[False,True])
 
+class EarningsGapAnalyzer:
+    def __init__(self, **kwargs):
+        self.signal_log = []
+        self.analysis_df = pd.DataFrame()
 
+    # --- RSI helper ---
+    def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
+        delta = series.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
+        rs = avg_gain / avg_loss.replace(0, np.nan)
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.bfill().ffill()
+
+    # --- PEG highlight ---
+    def highlight_peg(self, val):
+        try:
+            if val is not None and float(val) < 1.5:
+                return "color: green"
+        except:
+            pass
+        return ""
+
+    def analyze_buy(self, df: pd.DataFrame):
+        if df is None or df.empty:
+            self.analysis_df = pd.DataFrame(columns=[
+                "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
+            ])
+            return
+
+        # Compute RSI if missing
+        if "rsi14" not in df.columns:
+            df["rsi14"] = df.groupby("ticker", group_keys=False)["Close"].apply(lambda s: self.compute_rsi(s, 14))
+
+        # Rolling metrics
+        df["avg_vol_20"] = df.groupby("ticker", group_keys=False)["Volume"].rolling(20).mean().reset_index(level=0, drop=True)
+        df["ret_20"] = df.groupby("ticker", group_keys=False)["Close"].pct_change(20)
+
+        results = []
+        for idx, row in df.iterrows():
+            # Gap condition
+            if idx == 0 or row["Open"] < 1.02 * df.loc[idx-1, "Close"]:
+                continue
+            # Liquidity + PEG filters
+            if row["avg_vol_20"] < 1_000_000:
+                continue
+            if row["peg_ratio"] >= 4.5:
+                continue
+
+            gap_low = min(row["Open"], row["Low"])
+            i3 = idx + 2
+            if i3 >= len(df): 
+                continue
+            r3 = df.iloc[i3]
+
+            vol_ok = r3["Volume"] >= 1.2 * r3["avg_vol_20"]
+            price_ok = r3["Close"] > gap_low
+            momentum_ok = (r3["rsi14"] >= 40) and (r3["ret_20"] >= 0)
+
+            if not (vol_ok and price_ok and momentum_ok):
+                continue
+
+            # BUY signal
+            results.append({
+                "Ticker": row["ticker"],
+                "RSI": round(r3["rsi14"], 2),
+                "PEG": row["peg_ratio"],
+                "Signal": "BUY",
+                "Entry Date": r3["Date"],
+                "Exit Date": None,
+                "Status": "Active",
+                "Reason": "Earnings Gap Continuation"
+            })
+
+        self.analysis_df = pd.DataFrame(results)
+        self.signal_log.extend(results)
+
+    def analyze_sell(self, portfolio_df: pd.DataFrame):
+        # Optional: implement exit logic later
+        pass
+
+    def get_sheet_summary(self) -> pd.DataFrame:
+        if self.analysis_df.empty:
+            return pd.DataFrame(columns=[
+                "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
+            ])
+        return self.analysis_df.copy().sort_values(["Status","Ticker"], ascending=[False,True])
