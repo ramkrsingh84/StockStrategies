@@ -400,6 +400,17 @@ class EarningsGapAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
+    # --- Helper to detect ticker column ---
+    def _detect_ticker_column(self, df: pd.DataFrame) -> str:
+        for c in ["Ticker","ticker","Symbol","symbol","Instrument","instrument"]:
+            if c in df.columns:
+                return c
+        for c in df.columns:
+            lc = str(c).lower()
+            if lc.startswith("tick") or lc.startswith("symb"):
+                return c
+        raise KeyError("No ticker column found in DataFrame")
+
     # --- RSI helper ---
     def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
         delta = series.diff()
@@ -427,13 +438,17 @@ class EarningsGapAnalyzer:
             ])
             return
 
+        df = df.copy()
+        ticker_col = self._detect_ticker_column(df)
+
         # Compute RSI if missing
-        if "rsi14" not in df.columns:
-            df["rsi14"] = df.groupby("ticker", group_keys=False)["Close"].apply(lambda s: self.compute_rsi(s, 14))
+        if "rsi14" not in df.columns and "Close" in df.columns:
+            df["rsi14"] = df.groupby(ticker_col, group_keys=False)["Close"].apply(lambda s: self.compute_rsi(s, 14))
 
         # Rolling metrics
-        df["avg_vol_20"] = df.groupby("ticker", group_keys=False)["Volume"].rolling(20).mean().reset_index(level=0, drop=True)
-        df["ret_20"] = df.groupby("ticker", group_keys=False)["Close"].pct_change(20)
+        if "Volume" in df.columns and "Close" in df.columns:
+            df["avg_vol_20"] = df.groupby(ticker_col, group_keys=False)["Volume"].rolling(20).mean().reset_index(level=0, drop=True)
+            df["ret_20"] = df.groupby(ticker_col, group_keys=False)["Close"].pct_change(20)
 
         results = []
         for idx, row in df.iterrows():
@@ -441,9 +456,9 @@ class EarningsGapAnalyzer:
             if idx == 0 or row["Open"] < 1.02 * df.loc[idx-1, "Close"]:
                 continue
             # Liquidity + PEG filters
-            if row["avg_vol_20"] < 1_000_000:
+            if row.get("avg_vol_20", 0) < 1_000_000:
                 continue
-            if row["peg_ratio"] >= 4.5:
+            if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 4.5:
                 continue
 
             gap_low = min(row["Open"], row["Low"])
@@ -461,7 +476,7 @@ class EarningsGapAnalyzer:
 
             # BUY signal
             results.append({
-                "Ticker": row["ticker"],
+                "Ticker": row[ticker_col],
                 "RSI": round(r3["rsi14"], 2),
                 "PEG": row["peg_ratio"],
                 "Signal": "BUY",
