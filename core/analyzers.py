@@ -400,7 +400,6 @@ class EarningsGapAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-    # --- Detect ticker column (same as Nifty200RSIAnalyzer) ---
     def _detect_ticker_column(self, df: pd.DataFrame) -> str:
         for c in ["Ticker","ticker","Symbol","symbol","Instrument","instrument"]:
             if c in df.columns:
@@ -411,7 +410,6 @@ class EarningsGapAnalyzer:
                 return c
         raise KeyError("No ticker column found in DataFrame")
 
-    # --- RSI helper (same style as Nifty200RSIAnalyzer) ---
     def compute_rsi_wilder(self, series: pd.Series, period: int = 14) -> pd.Series:
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
@@ -448,17 +446,7 @@ class EarningsGapAnalyzer:
             return
 
         df = df.copy()
-        df.columns = df.columns.str.strip()
-
-        # Normalize OHLC names like in Nifty200RSIAnalyzer
-        rename_map = {
-            "open": "open", "Open": "open",
-            "high": "high", "High": "high",
-            "low": "low", "Low": "low",
-            "close": "close", "Close": "close",
-            "volume": "volume", "Volume": "volume"
-        }
-        df.rename(columns={c: rename_map[c] for c in df.columns if c in rename_map}, inplace=True)
+        df.columns = df.columns.str.strip().str.lower()  # normalize to lowercase
 
         ticker_col = self._detect_ticker_column(df)
 
@@ -495,13 +483,12 @@ class EarningsGapAnalyzer:
             if not (vol_ok and price_ok and momentum_ok):
                 continue
 
-            # BUY signal
             results.append({
                 "Ticker": row[ticker_col],
                 "RSI": round(r3["rsi14"], 2),
                 "PEG": row["peg_ratio"],
                 "Signal": "BUY",
-                "Entry Date": r3["trade_date"] if "trade_date" in r3 else r3.get("Date"),
+                "Entry Date": r3.get("trade_date"),
                 "Exit Date": None,
                 "Status": "Active",
                 "Reason": "Earnings Gap Continuation"
@@ -511,7 +498,6 @@ class EarningsGapAnalyzer:
         self.signal_log.extend(results)
 
     def analyze_sell(self, portfolio_df: pd.DataFrame):
-        # Optional: implement exit logic later
         pass
 
     def get_sheet_summary(self) -> pd.DataFrame:
