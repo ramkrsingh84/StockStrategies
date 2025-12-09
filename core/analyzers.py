@@ -410,6 +410,31 @@ class EarningsGapAnalyzer:
                 return c
         raise KeyError("No ticker column found in DataFrame")
 
+    def _fetch_ohlc_for_tickers(self, tickers: list, days: int = 90) -> pd.DataFrame:
+        from datetime import timedelta
+        cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
+        frames = []
+        CHUNK = 100
+        for i in range(0, len(tickers), CHUNK):
+            batch = tickers[i:i+CHUNK]
+            resp = (
+                self.supabase.table("ohlc_data")
+                .select("*")
+                .in_("ticker", batch)
+                .gte("trade_date", cutoff)
+                .execute()
+            )
+            data = getattr(resp, "data", [])
+            if data:
+                frames.append(pd.DataFrame(data))
+        if not frames:
+            return pd.DataFrame(columns=["ticker","trade_date","open","high","low","close","volume"])
+        df = pd.concat(frames, ignore_index=True)
+        df["trade_date"] = pd.to_datetime(df["trade_date"], errors="coerce")
+        for c in ["open","high","low","close","volume"]:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        return df
+    
     def compute_rsi_wilder(self, series: pd.Series, period: int = 14) -> pd.Series:
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
