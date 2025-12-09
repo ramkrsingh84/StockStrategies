@@ -36,7 +36,7 @@ STRATEGY_CONFIG = {
         "buy_tabs": ["Nifty_200"],
         "analyzer_class": Nifty200RSIAnalyzer,
         "sell_threshold_pct": 12
-    }
+    },
     "EarningsGap": {
         "sheet_name": "DMA_Data",
         "portfolio_tab": "Portfolio_GapUp",
