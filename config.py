@@ -1,4 +1,4 @@
-from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, TrendingValueAnalyzer, GARPAnalyzer, Nifty200RSIAnalyzer
+from core.analyzers import SignalAnalyzer, ConsolidateAnalyzer, TrendingValueAnalyzer, GARPAnalyzer, Nifty200RSIAnalyzer, EarningsGapAnalyzer
 
 
 STRATEGY_CONFIG = {
