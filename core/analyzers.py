@@ -520,7 +520,7 @@ class EarningsGapAnalyzer:
                     continue
                 if row["avg_vol_20"] < 1_000_000:
                     continue
-                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 40.5:
+                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 400.5:
                     continue
 
                 gap_low = min(row["open"], row["low"])
@@ -531,7 +531,7 @@ class EarningsGapAnalyzer:
 
                 vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
                 price_ok = r3["close"] > gap_low
-                momentum_ok = (r3["rsi14"] >= 35) and (r3["ret_20"] >= 0)
+                momentum_ok = (r3["rsi14"] >= 30) and (r3["ret_20"] >= 0)
 
                 if not (vol_ok and price_ok and momentum_ok):
                     continue
