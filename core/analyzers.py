@@ -438,61 +438,80 @@ class EarningsGapAnalyzer:
             pass
         return ""
 
-    def analyze_buy(self, df: pd.DataFrame):
-        if df is None or df.empty:
+    def analyze_buy(self, buy_df: pd.DataFrame):
+        if buy_df is None or buy_df.empty:
             self.analysis_df = pd.DataFrame(columns=[
                 "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
             ])
             return
 
-        df = df.copy()
-        df.columns = df.columns.str.strip().str.lower()  # normalize to lowercase
+        ticker_col = self._detect_ticker_column(buy_df)
+        raw_tickers = buy_df[ticker_col].astype(str).str.strip().dropna().unique().tolist()
 
-        ticker_col = self._detect_ticker_column(df)
+        # Normalize tickers to Yahoo format
+        normalized = []
+        for t in raw_tickers:
+            tt = t.upper()
+            if tt.startswith("NSE:"):
+                tt = tt.split("NSE:")[1] + ".NS"
+            elif not tt.endswith(".NS"):
+                tt = tt + ".NS"
+            normalized.append(tt)
 
-        # Compute RSI if missing
-        if "rsi14" not in df.columns and "close" in df.columns:
-            df["rsi14"] = df.groupby(ticker_col, group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
+        # 🔎 Fetch OHLC data from Supabase (like Nifty200RSIAnalyzer does)
+        ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
+        if ohlc.empty:
+            self.analysis_df = pd.DataFrame(columns=[
+                "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
+            ])
+            return
 
-        # Rolling metrics
-        if "volume" in df.columns and "close" in df.columns:
-            df["avg_vol_20"] = df.groupby(ticker_col, group_keys=False)["volume"].rolling(20).mean().reset_index(level=0, drop=True)
-            df["ret_20"] = df.groupby(ticker_col, group_keys=False)["close"].pct_change(20)
+        # Normalize column names to lowercase
+        ohlc.columns = ohlc.columns.str.strip().str.lower()
+
+        # Compute RSI
+        ohlc["rsi14"] = ohlc.groupby("ticker", group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
+        ohlc["avg_vol_20"] = ohlc.groupby("ticker", group_keys=False)["volume"].rolling(20).mean().reset_index(level=0, drop=True)
+        ohlc["ret_20"] = ohlc.groupby("ticker", group_keys=False)["close"].pct_change(20)
 
         results = []
-        for idx, row in df.iterrows():
-            # Gap condition
-            if idx == 0 or row["open"] < 1.02 * df.loc[idx-1, "close"]:
-                continue
-            # Liquidity + PEG filters
-            if row.get("avg_vol_20", 0) < 1_000_000:
-                continue
-            if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 4.5:
-                continue
+        for ticker in sorted(ohlc["ticker"].dropna().unique()):
+            sub = ohlc[ohlc["ticker"] == ticker].sort_values("trade_date")
+            for idx in range(1, len(sub)):
+                row = sub.iloc[idx]
+                prev = sub.iloc[idx-1]
 
-            gap_low = min(row["open"], row["low"])
-            i3 = idx + 2
-            if i3 >= len(df): 
-                continue
-            r3 = df.iloc[i3]
+                # Gap condition
+                if row["open"] < 1.02 * prev["close"]:
+                    continue
+                if row["avg_vol_20"] < 1_000_000:
+                    continue
+                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 4.5:
+                    continue
 
-            vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
-            price_ok = r3["close"] > gap_low
-            momentum_ok = (r3["rsi14"] >= 40) and (r3["ret_20"] >= 0)
+                gap_low = min(row["open"], row["low"])
+                i3 = idx + 2
+                if i3 >= len(sub):
+                    continue
+                r3 = sub.iloc[i3]
 
-            if not (vol_ok and price_ok and momentum_ok):
-                continue
+                vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
+                price_ok = r3["close"] > gap_low
+                momentum_ok = (r3["rsi14"] >= 40) and (r3["ret_20"] >= 0)
 
-            results.append({
-                "Ticker": row[ticker_col],
-                "RSI": round(r3["rsi14"], 2),
-                "PEG": row["peg_ratio"],
-                "Signal": "BUY",
-                "Entry Date": r3.get("trade_date"),
-                "Exit Date": None,
-                "Status": "Active",
-                "Reason": "Earnings Gap Continuation"
-            })
+                if not (vol_ok and price_ok and momentum_ok):
+                    continue
+
+                results.append({
+                    "Ticker": ticker,
+                    "RSI": round(r3["rsi14"], 2),
+                    "PEG": row.get("peg_ratio"),
+                    "Signal": "BUY",
+                    "Entry Date": r3["trade_date"].date().isoformat(),
+                    "Exit Date": None,
+                    "Status": "Active",
+                    "Reason": "Earnings Gap Continuation"
+                })
 
         self.analysis_df = pd.DataFrame(results)
         self.signal_log.extend(results)
