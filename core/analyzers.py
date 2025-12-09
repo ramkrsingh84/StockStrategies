@@ -400,7 +400,7 @@ class EarningsGapAnalyzer:
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
 
-    # --- Helper to detect ticker column ---
+    # --- Detect ticker column (same as Nifty200RSIAnalyzer) ---
     def _detect_ticker_column(self, df: pd.DataFrame) -> str:
         for c in ["Ticker","ticker","Symbol","symbol","Instrument","instrument"]:
             if c in df.columns:
@@ -411,18 +411,27 @@ class EarningsGapAnalyzer:
                 return c
         raise KeyError("No ticker column found in DataFrame")
 
-    # --- RSI helper ---
-    def compute_rsi(self, series: pd.Series, period: int = 14) -> pd.Series:
+    # --- RSI helper (same style as Nifty200RSIAnalyzer) ---
+    def compute_rsi_wilder(self, series: pd.Series, period: int = 14) -> pd.Series:
+        if series is None or series.empty or series.shape[0] < period + 1:
+            return pd.Series([None] * series.shape[0], index=series.index)
         delta = series.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
-        avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
-        rs = avg_gain / avg_loss.replace(0, np.nan)
-        rsi = 100 - (100 / (1 + rs))
-        return rsi.bfill().ffill()
+        avg_gain = gain.iloc[1:period+1].mean()
+        avg_loss = loss.iloc[1:period+1].mean()
+        rsi_values = [None] * len(series)
+        for i in range(period+1, len(series)):
+            avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
+            avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
+            if avg_loss == 0:
+                rsi = 100
+            else:
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
+            rsi_values[i] = rsi
+        return pd.Series(rsi_values, index=series.index)
 
-    # --- PEG highlight ---
     def highlight_peg(self, val):
         try:
             if val is not None and float(val) < 1.5:
@@ -439,21 +448,33 @@ class EarningsGapAnalyzer:
             return
 
         df = df.copy()
+        df.columns = df.columns.str.strip()
+
+        # Normalize OHLC names like in Nifty200RSIAnalyzer
+        rename_map = {
+            "open": "open", "Open": "open",
+            "high": "high", "High": "high",
+            "low": "low", "Low": "low",
+            "close": "close", "Close": "close",
+            "volume": "volume", "Volume": "volume"
+        }
+        df.rename(columns={c: rename_map[c] for c in df.columns if c in rename_map}, inplace=True)
+
         ticker_col = self._detect_ticker_column(df)
 
         # Compute RSI if missing
-        if "rsi14" not in df.columns and "Close" in df.columns:
-            df["rsi14"] = df.groupby(ticker_col, group_keys=False)["Close"].apply(lambda s: self.compute_rsi(s, 14))
+        if "rsi14" not in df.columns and "close" in df.columns:
+            df["rsi14"] = df.groupby(ticker_col, group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
 
         # Rolling metrics
-        if "Volume" in df.columns and "Close" in df.columns:
-            df["avg_vol_20"] = df.groupby(ticker_col, group_keys=False)["Volume"].rolling(20).mean().reset_index(level=0, drop=True)
-            df["ret_20"] = df.groupby(ticker_col, group_keys=False)["Close"].pct_change(20)
+        if "volume" in df.columns and "close" in df.columns:
+            df["avg_vol_20"] = df.groupby(ticker_col, group_keys=False)["volume"].rolling(20).mean().reset_index(level=0, drop=True)
+            df["ret_20"] = df.groupby(ticker_col, group_keys=False)["close"].pct_change(20)
 
         results = []
         for idx, row in df.iterrows():
             # Gap condition
-            if idx == 0 or row["Open"] < 1.02 * df.loc[idx-1, "Close"]:
+            if idx == 0 or row["open"] < 1.02 * df.loc[idx-1, "close"]:
                 continue
             # Liquidity + PEG filters
             if row.get("avg_vol_20", 0) < 1_000_000:
@@ -461,14 +482,14 @@ class EarningsGapAnalyzer:
             if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 4.5:
                 continue
 
-            gap_low = min(row["Open"], row["Low"])
+            gap_low = min(row["open"], row["low"])
             i3 = idx + 2
             if i3 >= len(df): 
                 continue
             r3 = df.iloc[i3]
 
-            vol_ok = r3["Volume"] >= 1.2 * r3["avg_vol_20"]
-            price_ok = r3["Close"] > gap_low
+            vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
+            price_ok = r3["close"] > gap_low
             momentum_ok = (r3["rsi14"] >= 40) and (r3["ret_20"] >= 0)
 
             if not (vol_ok and price_ok and momentum_ok):
@@ -480,7 +501,7 @@ class EarningsGapAnalyzer:
                 "RSI": round(r3["rsi14"], 2),
                 "PEG": row["peg_ratio"],
                 "Signal": "BUY",
-                "Entry Date": r3["Date"],
+                "Entry Date": r3["trade_date"] if "trade_date" in r3 else r3.get("Date"),
                 "Exit Date": None,
                 "Status": "Active",
                 "Reason": "Earnings Gap Continuation"
