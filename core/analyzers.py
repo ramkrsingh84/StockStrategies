@@ -399,7 +399,16 @@ class EarningsGapAnalyzer:
     def __init__(self, **kwargs):
         self.signal_log = []
         self.analysis_df = pd.DataFrame()
+        self.active_signals = {}
 
+        # Supabase client (same as Nifty200RSIAnalyzer)
+        import streamlit as st
+        from supabase import create_client
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+        self.supabase = create_client(url, key)
+
+    # --- Detect ticker column ---
     def _detect_ticker_column(self, df: pd.DataFrame) -> str:
         for c in ["Ticker","ticker","Symbol","symbol","Instrument","instrument"]:
             if c in df.columns:
@@ -410,8 +419,9 @@ class EarningsGapAnalyzer:
                 return c
         raise KeyError("No ticker column found in DataFrame")
 
+    # --- Fetch OHLC from Supabase ---
     def _fetch_ohlc_for_tickers(self, tickers: list, days: int = 90) -> pd.DataFrame:
-        from datetime import timedelta
+        from datetime import datetime, timedelta
         cutoff = (datetime.today() - timedelta(days=days)).date().isoformat()
         frames = []
         CHUNK = 100
@@ -434,7 +444,8 @@ class EarningsGapAnalyzer:
         for c in ["open","high","low","close","volume"]:
             df[c] = pd.to_numeric(df[c], errors="coerce")
         return df
-    
+
+    # --- RSI helper ---
     def compute_rsi_wilder(self, series: pd.Series, period: int = 14) -> pd.Series:
         if series is None or series.empty or series.shape[0] < period + 1:
             return pd.Series([None] * series.shape[0], index=series.index)
@@ -463,6 +474,7 @@ class EarningsGapAnalyzer:
             pass
         return ""
 
+    # --- BUY analysis ---
     def analyze_buy(self, buy_df: pd.DataFrame):
         if buy_df is None or buy_df.empty:
             self.analysis_df = pd.DataFrame(columns=[
@@ -483,7 +495,7 @@ class EarningsGapAnalyzer:
                 tt = tt + ".NS"
             normalized.append(tt)
 
-        # 🔎 Fetch OHLC data from Supabase (like Nifty200RSIAnalyzer does)
+        # Fetch OHLC data
         ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
         if ohlc.empty:
             self.analysis_df = pd.DataFrame(columns=[
@@ -491,10 +503,7 @@ class EarningsGapAnalyzer:
             ])
             return
 
-        # Normalize column names to lowercase
-        ohlc.columns = ohlc.columns.str.strip().str.lower()
-
-        # Compute RSI
+        # Compute RSI and rolling metrics
         ohlc["rsi14"] = ohlc.groupby("ticker", group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
         ohlc["avg_vol_20"] = ohlc.groupby("ticker", group_keys=False)["volume"].rolling(20).mean().reset_index(level=0, drop=True)
         ohlc["ret_20"] = ohlc.groupby("ticker", group_keys=False)["close"].pct_change(20)
