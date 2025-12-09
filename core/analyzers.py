@@ -520,7 +520,7 @@ class EarningsGapAnalyzer:
                     continue
                 if row["avg_vol_20"] < 1_000_000:
                     continue
-                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 4.5:
+                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 40.5:
                     continue
 
                 gap_low = min(row["open"], row["low"])
