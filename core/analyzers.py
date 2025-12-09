@@ -364,7 +364,7 @@ class Nifty200RSIAnalyzer:
                 after_dip = recent.loc[dip_index:]
 
                 crossed_40 = (after_dip["rsi"] >= 40).any()
-                blocked = (after_dip["rsi"] >= 55).any()
+                blocked = (after_dip["rsi"] >= 45).any()
 
                 if crossed_40 and not blocked:
                     if not self.active_signals.get(ticker, False):
@@ -531,7 +531,7 @@ class EarningsGapAnalyzer:
 
                 vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
                 price_ok = r3["close"] > gap_low
-                momentum_ok = (r3["rsi14"] >= 40) and (r3["ret_20"] >= 0)
+                momentum_ok = (r3["rsi14"] >= 35) and (r3["ret_20"] >= 0)
 
                 if not (vol_ok and price_ok and momentum_ok):
                     continue
