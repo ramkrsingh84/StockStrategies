@@ -546,17 +546,8 @@ class EarningsGapAnalyzer:
             momentum_ok = (row["rsi14"] >= 40) and (row["ret_20"] >= 0)
 
             #print("DEBUG: tickers processed =", len(ohlc["ticker"].unique()))
-            # --- Debug print per ticker ---
-            print(
-                f"DEBUG {ticker} {row['trade_date'].date()} | "
-                f"open={row['open']:.2f}, prev_close={prev['close']:.2f}, gap_cond={gap_cond} | "
-                f"avg_vol_20={row['avg_vol_20']:.0f}, volume={row['volume']:.0f}, vol_cond={vol_cond}, vol_ok={vol_ok} | "
-                f"peg={row.get('peg_ratio')} peg_cond={peg_cond} | "
-                f"close={row['close']:.2f}, gap_low={gap_low:.2f}, price_ok={price_ok} | "
-                f"RSI={row['rsi14']:.2f}, ret_20={row['ret_20']:.2%}, momentum_ok={momentum_ok}"
-            )
-
-            if not (vol_cond and peg_cond and vol_ok and momentum_ok):
+            
+            if not (gap_cond and vol_cond and peg_cond and vol_ok and price_ok and momentum_ok):
                 continue
 
             results.append({
