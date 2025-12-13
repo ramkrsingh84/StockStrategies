@@ -576,6 +576,8 @@ class EarningsGapAnalyzer:
         df = self.analysis_df.copy()
         df = df.sort_values(["Entry Date"], ascending=True)
         df = df.drop_duplicates(subset=["Ticker"], keep="last")
+        print("DEBUG: buy_df tickers =", buy_df[ticker_col].nunique())
+
         
         # Final sort for display
         return df.sort_values(["Status","Ticker"], ascending=[False,True])
