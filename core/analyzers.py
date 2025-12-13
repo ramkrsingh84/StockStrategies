@@ -503,6 +503,12 @@ class EarningsGapAnalyzer:
                 "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
             ])
             return
+        
+        # Merge PEG from buy_df (sheet) into OHLC
+        if "PEG" in buy_df.columns:
+            peg_map = buy_df[[ticker_col, "PEG"]].rename(columns={ticker_col: "ticker"})
+            ohlc = ohlc.merge(peg_map, on="ticker", how="left")
+            ohlc.rename(columns={"PEG": "peg_ratio"}, inplace=True)
 
         # Compute indicators
         ohlc["rsi14"] = ohlc.groupby("ticker", group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
