@@ -506,8 +506,9 @@ class EarningsGapAnalyzer:
         
         # Merge PEG from buy_df (sheet) into OHLC
         if "PEG" in buy_df.columns:
-            peg_map = buy_df[[ticker_col, "PEG"]].rename(columns={ticker_col: "ticker"})
-            ohlc = ohlc.merge(peg_map, on="ticker", how="left")
+            peg_map = buy_df[[ticker_col, "PEG"]].copy()
+            peg_map["ticker"] = peg_map[ticker_col].str.upper().str.replace("NSE:", "") + ".NS"
+            ohlc = ohlc.merge(peg_map[["ticker","PEG"]], on="ticker", how="left")
             ohlc.rename(columns={"PEG": "peg_ratio"}, inplace=True)
 
         # Compute indicators
