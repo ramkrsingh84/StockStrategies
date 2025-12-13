@@ -549,6 +549,7 @@ class EarningsGapAnalyzer:
             price_ok = row["close"] > gap_low
             momentum_ok = (row["rsi14"] >= 40) and (row["ret_20"] >= 0)
 
+            print("DEBUG: tickers processed =", len(ohlc["ticker"].unique()))
             # --- Debug print per ticker ---
             print(
                 f"DEBUG {ticker} {row['trade_date'].date()} | "
