@@ -529,7 +529,7 @@ class EarningsGapAnalyzer:
 
             gap_cond = row["open"] >= 1.02 * prev["close"]
             vol_cond = row["avg_vol_20"] >= 1_000_000
-            peg_cond = pd.notna(row["peg_ratio"]) and row["peg_ratio"] < 4.5
+            peg_cond = pd.notna(row["peg_ratio"]) and row["peg_ratio"] < 10.5
 
             gap_low = min(row["open"], row["low"])
             vol_ok = row["volume"] >= 1.2 * row["avg_vol_20"]
