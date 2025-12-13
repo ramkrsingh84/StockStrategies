@@ -435,6 +435,10 @@ class EarningsGapAnalyzer:
                 .execute()
             )
             data = getattr(resp, "data", [])
+            print("DEBUG: Fetching batch size =", len(batch), "cutoff =", cutoff)
+            print("DEBUG: Supabase returned rows =", len(data))
+            if data:
+                print("DEBUG: Sample tickers in batch =", pd.DataFrame(data)['ticker'].unique()[:10])
             if data:
                 frames.append(pd.DataFrame(data))
         if not frames:
