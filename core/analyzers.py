@@ -571,4 +571,11 @@ class EarningsGapAnalyzer:
             return pd.DataFrame(columns=[
                 "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
             ])
-        return self.analysis_df.copy().sort_values(["Status","Ticker"], ascending=[False,True])
+        
+        # Deduplicate: keep only the latest entry per ticker
+        df = self.analysis_df.copy()
+        df = df.sort_values(["Entry Date"], ascending=True)
+        df = df.drop_duplicates(subset=["Ticker"], keep="last")
+        
+        # Final sort for display
+        return df.sort_values(["Status","Ticker"], ascending=[False,True])
