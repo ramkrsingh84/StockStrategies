@@ -485,7 +485,7 @@ class EarningsGapAnalyzer:
         ticker_col = self._detect_ticker_column(buy_df)
         raw_tickers = buy_df[ticker_col].astype(str).str.strip().dropna().unique().tolist()
 
-        # Normalize tickers to Yahoo format
+        # Normalize tickers
         normalized = []
         for t in raw_tickers:
             tt = t.upper()
@@ -495,15 +495,16 @@ class EarningsGapAnalyzer:
                 tt = tt + ".NS"
             normalized.append(tt)
 
-        # Fetch OHLC data
+        # Fetch OHLC
         ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
         if ohlc.empty:
+            print("DEBUG: No OHLC data fetched from Supabase")
             self.analysis_df = pd.DataFrame(columns=[
                 "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
             ])
             return
 
-        # Compute RSI and rolling metrics
+        # Compute indicators
         ohlc["rsi14"] = ohlc.groupby("ticker", group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
         ohlc["avg_vol_20"] = ohlc.groupby("ticker", group_keys=False)["volume"].rolling(20).mean().reset_index(level=0, drop=True)
         ohlc["ret_20"] = ohlc.groupby("ticker", group_keys=False)["close"].pct_change(20)
@@ -511,50 +512,45 @@ class EarningsGapAnalyzer:
         results = []
         for ticker in sorted(ohlc["ticker"].dropna().unique()):
             sub = ohlc[ohlc["ticker"] == ticker].sort_values("trade_date")
-            for idx in range(1, len(sub)):
-                row = sub.iloc[idx]
-                prev = sub.iloc[idx-1]
-                
-                # Debug each condition
-                gap_cond = row["open"] >= 1.02 * prev["close"]
-                vol_cond = row["avg_vol_20"] >= 1_000_000
-                peg_cond = row.get("peg_ratio", None) is not None and row["peg_ratio"] < 4.5
+            if len(sub) < 2:
+                continue
 
-                print(f"DEBUG {ticker} {row['trade_date'].date()} gap={gap_cond} vol={vol_cond} peg={peg_cond}")
+            # Latest vs previous day
+            row = sub.iloc[-1]
+            prev = sub.iloc[-2]
 
-                # Gap condition
-                if row["open"] < 1.02 * prev["close"]:
-                    continue
-                if row["avg_vol_20"] < 1_000_000:
-                    continue
-                if row.get("peg_ratio", None) is None or row["peg_ratio"] >= 400.5:
-                    continue
+            gap_cond = row["open"] >= 1.02 * prev["close"]
+            vol_cond = row["avg_vol_20"] >= 1_000_000
+            peg_cond = row.get("peg_ratio", None) is not None and row["peg_ratio"] < 4.5
 
-                gap_low = min(row["open"], row["low"])
-                i3 = idx + 2
-                if i3 >= len(sub):
-                    continue
-                r3 = sub.iloc[i3]
+            gap_low = min(row["open"], row["low"])
+            vol_ok = row["volume"] >= 1.2 * row["avg_vol_20"]
+            price_ok = row["close"] > gap_low
+            momentum_ok = (row["rsi14"] >= 40) and (row["ret_20"] >= 0)
 
-                vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
-                price_ok = r3["close"] > gap_low
-                momentum_ok = (r3["rsi14"] >= 30) and (r3["ret_20"] >= 0)
-                
-                print(f"DEBUG {ticker} {r3['trade_date'].date()} vol_ok={vol_ok} price_ok={price_ok} momentum_ok={momentum_ok}")
+            # --- Debug print per ticker ---
+            print(
+                f"DEBUG {ticker} {row['trade_date'].date()} | "
+                f"open={row['open']:.2f}, prev_close={prev['close']:.2f}, gap_cond={gap_cond} | "
+                f"avg_vol_20={row['avg_vol_20']:.0f}, volume={row['volume']:.0f}, vol_cond={vol_cond}, vol_ok={vol_ok} | "
+                f"peg={row.get('peg_ratio')} peg_cond={peg_cond} | "
+                f"close={row['close']:.2f}, gap_low={gap_low:.2f}, price_ok={price_ok} | "
+                f"RSI={row['rsi14']:.2f}, ret_20={row['ret_20']:.2%}, momentum_ok={momentum_ok}"
+            )
 
-                if not (vol_ok and price_ok and momentum_ok):
-                    continue
+            if not (gap_cond and vol_cond and peg_cond and vol_ok and price_ok and momentum_ok):
+                continue
 
-                results.append({
-                    "Ticker": ticker,
-                    "RSI": round(r3["rsi14"], 2),
-                    "PEG": row.get("peg_ratio"),
-                    "Signal": "BUY",
-                    "Entry Date": r3["trade_date"].date().isoformat(),
-                    "Exit Date": None,
-                    "Status": "Active",
-                    "Reason": "Earnings Gap Continuation"
-                })
+            results.append({
+                "Ticker": ticker,
+                "RSI": round(row["rsi14"], 2),
+                "PEG": row.get("peg_ratio"),
+                "Signal": "BUY",
+                "Entry Date": row["trade_date"].date().isoformat(),
+                "Exit Date": None,
+                "Status": "Active",
+                "Reason": "Earnings Gap Continuation"
+            })
 
         self.analysis_df = pd.DataFrame(results)
         self.signal_log.extend(results)
