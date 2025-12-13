@@ -510,6 +510,7 @@ class EarningsGapAnalyzer:
             peg_map["ticker"] = peg_map[ticker_col].str.upper().str.replace("NSE:", "") + ".NS"
             ohlc = ohlc.merge(peg_map[["ticker","PEG"]], on="ticker", how="left")
             ohlc.rename(columns={"PEG": "peg_ratio"}, inplace=True)
+            ohlc["peg_ratio"] = pd.to_numeric(ohlc["peg_ratio"], errors="coerce")
 
         # Compute indicators
         ohlc["rsi14"] = ohlc.groupby("ticker", group_keys=False)["close"].apply(lambda s: self.compute_rsi_wilder(s, 14))
@@ -528,7 +529,7 @@ class EarningsGapAnalyzer:
 
             gap_cond = row["open"] >= 1.02 * prev["close"]
             vol_cond = row["avg_vol_20"] >= 1_000_000
-            peg_cond = row.get("peg_ratio", None) is not None and row["peg_ratio"] < 4.5
+            peg_cond = pd.notna(row["peg_ratio"]) and row["peg_ratio"] < 4.5
 
             gap_low = min(row["open"], row["low"])
             vol_ok = row["volume"] >= 1.2 * row["avg_vol_20"]
