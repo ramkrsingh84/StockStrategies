@@ -514,6 +514,13 @@ class EarningsGapAnalyzer:
             for idx in range(1, len(sub)):
                 row = sub.iloc[idx]
                 prev = sub.iloc[idx-1]
+                
+                # Debug each condition
+                gap_cond = row["open"] >= 1.02 * prev["close"]
+                vol_cond = row["avg_vol_20"] >= 1_000_000
+                peg_cond = row.get("peg_ratio", None) is not None and row["peg_ratio"] < 4.5
+
+                print(f"DEBUG {ticker} {row['trade_date'].date()} gap={gap_cond} vol={vol_cond} peg={peg_cond}")
 
                 # Gap condition
                 if row["open"] < 1.02 * prev["close"]:
@@ -532,6 +539,8 @@ class EarningsGapAnalyzer:
                 vol_ok = r3["volume"] >= 1.2 * r3["avg_vol_20"]
                 price_ok = r3["close"] > gap_low
                 momentum_ok = (r3["rsi14"] >= 30) and (r3["ret_20"] >= 0)
+                
+                print(f"DEBUG {ticker} {r3['trade_date'].date()} vol_ok={vol_ok} price_ok={price_ok} momentum_ok={momentum_ok}")
 
                 if not (vol_ok and price_ok and momentum_ok):
                     continue
