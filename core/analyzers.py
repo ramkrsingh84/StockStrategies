@@ -494,6 +494,9 @@ class EarningsGapAnalyzer:
             elif not tt.endswith(".NS"):
                 tt = tt + ".NS"
             normalized.append(tt)
+        
+        print("DEBUG: raw_tickers =", len(raw_tickers))
+        print("DEBUG: normalized =", len(normalized))
 
         # Fetch OHLC
         ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
