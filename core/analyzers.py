@@ -427,21 +427,25 @@ class EarningsGapAnalyzer:
         CHUNK = 100
         for i in range(0, len(tickers), CHUNK):
             batch = tickers[i:i+CHUNK]
-            resp = (
-                self.supabase.table("ohlc_data")
-                .select("*")
-                .in_("ticker", batch)
-                .gte("trade_date", cutoff)
-                .range(0, 9999)
-                .execute()
-            )
-            data = getattr(resp, "data", [])
-            print("DEBUG: Fetching batch size =", len(batch), "cutoff =", cutoff)
-            print("DEBUG: Supabase returned rows =", len(data))
-            if data:
-                print("DEBUG: Sample tickers in batch =", pd.DataFrame(data)['ticker'].unique()[:10])
-            if data:
+            start = 0
+            page_size = 1000
+            while True:
+                resp = (
+                    self.supabase.table("ohlc_data")
+                    .select("*")
+                    .in_("ticker", batch)
+                    .gte("trade_date", cutoff)
+                    .range(start, start + page_size - 1)
+                    .execute()
+                )
+                data = getattr(resp, "data", [])
+                if not data:
+                    break
                 frames.append(pd.DataFrame(data))
+                # If fewer than page_size rows returned, we’re done
+                if len(data) < page_size:
+                    break
+                start += page_size
         if not frames:
             return pd.DataFrame(columns=["ticker","trade_date","open","high","low","close","volume"])
         df = pd.concat(frames, ignore_index=True)
