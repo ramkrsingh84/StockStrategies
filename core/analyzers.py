@@ -500,6 +500,7 @@ class EarningsGapAnalyzer:
 
         # Fetch OHLC
         ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
+        print("DEBUG: OHLC tickers fetched =", ohlc['ticker'].nunique())
         if ohlc.empty:
             print("DEBUG: No OHLC data fetched from Supabase")
             self.analysis_df = pd.DataFrame(columns=[
