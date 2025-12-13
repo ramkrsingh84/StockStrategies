@@ -556,7 +556,7 @@ class EarningsGapAnalyzer:
                 f"RSI={row['rsi14']:.2f}, ret_20={row['ret_20']:.2%}, momentum_ok={momentum_ok}"
             )
 
-            if not (gap_cond and vol_cond and peg_cond and vol_ok and momentum_ok):
+            if not (vol_cond and peg_cond and vol_ok and momentum_ok):
                 continue
 
             results.append({
