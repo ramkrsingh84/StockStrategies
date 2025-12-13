@@ -503,13 +503,9 @@ class EarningsGapAnalyzer:
             elif not tt.endswith(".NS"):
                 tt = tt + ".NS"
             normalized.append(tt)
-        
-        print("DEBUG: raw_tickers =", len(raw_tickers))
-        print("DEBUG: normalized =", len(normalized))
 
         # Fetch OHLC
         ohlc = self._fetch_ohlc_for_tickers(normalized, days=90)
-        print("DEBUG: OHLC tickers fetched =", ohlc['ticker'].nunique())
         if ohlc.empty:
             print("DEBUG: No OHLC data fetched from Supabase")
             self.analysis_df = pd.DataFrame(columns=[
@@ -541,11 +537,11 @@ class EarningsGapAnalyzer:
             prev = sub.iloc[-2]
 
             gap_cond = row["open"] >= 1.02 * prev["close"]
-            vol_cond = row["avg_vol_20"] >= 1_000_000
-            peg_cond = pd.notna(row["peg_ratio"]) and row["peg_ratio"] < 10.5
+            vol_cond = row["avg_vol_20"] >= 700_000
+            peg_cond = pd.notna(row["peg_ratio"]) and row["peg_ratio"] < 4.5
 
             gap_low = min(row["open"], row["low"])
-            vol_ok = row["volume"] >= 1.2 * row["avg_vol_20"]
+            vol_ok = row["volume"] >= 1.1 * row["avg_vol_20"]
             price_ok = row["close"] > gap_low
             momentum_ok = (row["rsi14"] >= 40) and (row["ret_20"] >= 0)
 
