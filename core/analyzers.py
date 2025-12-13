@@ -566,18 +566,3 @@ class EarningsGapAnalyzer:
     def analyze_sell(self, portfolio_df: pd.DataFrame):
         pass
 
-    def get_sheet_summary(self) -> pd.DataFrame:
-        if self.analysis_df.empty:
-            return pd.DataFrame(columns=[
-                "Ticker","RSI","PEG","Signal","Entry Date","Exit Date","Status","Reason"
-            ])
-        
-        # Deduplicate: keep only the latest entry per ticker
-        df = self.analysis_df.copy()
-        df = df.sort_values(["Entry Date"], ascending=True)
-        df = df.drop_duplicates(subset=["Ticker"], keep="last")
-        print("DEBUG: buy_df tickers =", buy_df[ticker_col].nunique())
-
-        
-        # Final sort for display
-        return df.sort_values(["Status","Ticker"], ascending=[False,True])
