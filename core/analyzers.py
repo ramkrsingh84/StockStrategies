@@ -432,6 +432,7 @@ class EarningsGapAnalyzer:
                 .select("*")
                 .in_("ticker", batch)
                 .gte("trade_date", cutoff)
+                .range(0, 9999)
                 .execute()
             )
             data = getattr(resp, "data", [])
